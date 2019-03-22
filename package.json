@@ -1,0 +1,33 @@
+{
+  "name": "respond-framework",
+  "version": "0.0.1",
+  "description": "Don't just React, Respond -- Finally scale your React codebase w/ ease",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/faceyspacey/respond-framework.git"
+  },
+  "keywords": [
+    "react",
+    "redux",
+    "respond",
+    "respond-framework",
+    "rudy",
+    "remixx",
+    "redux-first-router",
+    "react-universal-component",
+    "graphql",
+    "npm",
+    "javascript",
+    "node"
+  ],
+  "author": "James Gillmore <james@faceyspacey.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/faceyspacey/respond-framework/issues"
+  },
+  "homepage": "https://github.com/faceyspacey/respond-framework#readme"
+}

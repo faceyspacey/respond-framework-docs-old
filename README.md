@@ -15,6 +15,8 @@ yarn add 'respond-framework'
 
 
 
+
+
 ## Modular (did I hear you say "Redux Modules"??)
 
 Respond Framework is modular and encapsulated like React components, but at a higher level. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off and build with confidence that what they bring back will plugin nicely.

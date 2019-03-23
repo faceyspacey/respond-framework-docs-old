@@ -242,7 +242,7 @@ This gives us great control over route transitions. For example, we can bail out
 
 ## Generated Action Creators & Types
 
-Your `routes` object generates all the action types your application needs. For example in the current app, so for we have:
+Your `routes` object generates all the action types your application needs. For example in the current app, so far we have:
 
 - `actions.home()`
 - `actions.login()`
@@ -479,7 +479,7 @@ export default createModule({
 })
 ```
 
-and were wondering how `actions.login` and `state.session` was guaranteed to be unique if this component was part of a module on NPM, you'd be a keen observer.
+and were wondering how `actions.metrics` and `state.foo` was guaranteed to be unique if this component was part of a module on NPM, you'd be a keen observer.
 
 Under the hood (within the `state` and `actions` proxies) here's what's actually being called:
 

@@ -14,7 +14,7 @@ yarn add 'respond-framework'
 ```
 
 
-![Respond Framework Homepage](./docs/respond-homepage.png)
+![Respond Framework Homepage](./docs/images/respond-homepage.png)
 
 
 ## Modular (did I hear you say "Redux Modules"??)

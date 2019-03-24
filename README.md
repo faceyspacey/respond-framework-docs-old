@@ -161,7 +161,7 @@ export default createModule({
   }
 })
 ```
-> `types`, `actions` & `state` are supplied via dependency injection to avoid conflicts; that also reduces # of imports
+> `types`, `actions`, `state`  supplied via dependency injection to avoid conflicts; which also means less importing
 
 ### Add callbacks that fire for all routes:
 
@@ -246,11 +246,13 @@ export default createModule({
 
 ## 100% Customizable Middleware
 
-The backbone of Respond is our routing slash side-effects library, *Rudy*. *Rudy* offers an async middleware API similar to [koa-compose](https://github.com/koajs/compose) with "rewind."
+The backbone of Respond is our routing slash side-effects library, *Rudy*, which is hard at work under the hood. *Rudy* offers an async middleware API similar to [koa-compose](https://github.com/koajs/compose) with "rewind."
 
-What this means is that each middleware will pause execution of the route change and asynchronously complete before passing the request to the next middleware in the chain. While classic Redux offers a synchronous middleware API, ours is async to meet the demands of today.
+What this means is that each middleware asynchronously gets a chance to operate on the `route` before passing the request to the next middleware in the chain. 
 
-The above `routes` could be minimally served with this middleware pipeline:
+> classic Redux offers a synchronous middleware API, ours is async to meet the demands of today.
+
+The above `routes` could be minimally served with this custom middleware pipeline:
 
 ```js
 export default createModule(config, options, [
@@ -263,11 +265,11 @@ export default createModule(config, options, [
 ])
 ```
 
-> All the callback names passed to `call` are available as keys on your routes and executed at the appropriate time during route transitions. The `call` middleware has many other super powers like automatically dispatching returns as actions.
+All the callback names passed to `call` are available as keys on your routes and executed at the appropriate time during route transitions. The `call` middleware has many other super powers like automatic dispatch of returns.
 
-Each middleware also has a 2nd chance to peform work as the chain "rewinds." 
+Each middleware also has a 2nd chance to peform work as the chain "rewinds." This gives us great control over route transitions. 
 
-This gives us great control over route transitions. For example, we can bail out at any time (before or after `enter`). We have even figured out how to do this in bail-outs triggered by browser back/next buttons, thanks to our custom `History` package within core. *By the way, our `History` is truly one of a kind--first to keep track of browser history `entries`, more on that to come...*
+For example, we can bail out at any time (before or after `enter`). We have even figured out how to do this in bail-outs triggered by browser back/next buttons, thanks to our custom `History` package within core. *By the way, our `History` is truly one of a kind--first in the world to keep track of browser history `entries`; more on that to come...*
 
 > If you're wondering, yes, you can still use the traditional Redux enhancer/middleware APIs like the Devtools and Sagas
 
@@ -308,10 +310,10 @@ And:
 
 They are accessible in their lowercased form at, for example: `types.home` or `actions.home.type`.
 
-They are **injected** into callbacks:
+Along with `state`, they are **injected** into callbacks:
 
 ```js
-thunk: ({ types, actions }) => 
+thunk: ({ types, actions, state }) => 
 ```
 
 Into reducers:
@@ -328,11 +330,9 @@ And components:
 const RespondComponent = (props, state, actions) => <Button onClick={actions.login} />
 ```
 
-> 3 argument components will be covered shortly
+Because *Respond Modules* are guaranteed to be unaware of the outside world **(even though they're conveniently using the same store)**, `actions`, `types` and `state` must be injected by the framework. This allows Respond to transparently normalize namespace access under the hood via proxies, so you only have to use namespaces where you absolutely must, which brings up an important point:
 
-Because *Respond Modules* are guaranteed to be unaware of the outside world (even though they're conveniently using the same store), `actions`, `types` and `state` must be injected by the framework. This allows Respond to transparently normalize namespace access under the hood via proxies, so you only have to use namespaces where you absolutely must, which brings up an important point:
-
-**Actions, state and types from child modules is available in parent components by their namespace.** Whereas child modules must use `moduleProps` to access the same from the parent. In other words, parents get to know whats up with their children, but not the other way around (kind of like in real life :)
+**Actions, state and types from child modules is available in parent components by their namespace.** Whereas child modules must use `moduleProps` to access the same from the parent. In other words, parents get to know whats up with their children, but not the other way around *(kind of like in real life :)*
 
 
 
@@ -348,7 +348,7 @@ export default createModule(config, options, [
   anonymousThunk,
   pathlessRoute('thunk')   
   transformAction,          // pipeline starts here
-  codeSplitModule('load'),  
+>  codeSplitModule('load'),  
   call('beforeLeave', { prev: true }),
   call('beforeEnter'),
   enter,
@@ -360,7 +360,12 @@ export default createModule(config, options, [
 ])
 ```
 
-The `codeSplitModule` middleware is responsible for insuring modules (including their components, reducers and route side-effects) are loaded before the route executes. In other words, the plane is built while flying.
+The `codeSplitModule` middleware is responsible for insuring modules (including their components, reducers and route side-effects) are loaded before the route executes. **In other words, the plane is built while flying.**
+
+Some middleware--**the "short-circuiting" middleware**--serves to perform a quick function before quickly exiting the pipeline. *Example:* handling anonymous thunks, or routes that have just a thunk but no path (which is a convenient way to consistently use the same route configuration object API).
+
+## Seamless Prefetching
+
 
 Routes can also be prefetched, including both their Webpack chunks and data dependencies which get cached.
 
@@ -383,7 +388,9 @@ routes: {
 }
 ```
 
-> If you provide a precise action, both the chunk *and callbacks such as thunks* will be called (with their results cached, aka stored in Redux); if you, supply just a string as in `types.login`, only the chunk for the matching route will be called (since thunks wouldn't know what to fetch without precise params/etc).
+If you provide a precise action, both the chunk *and callbacks such as thunks* will be called (with their results **cached**, aka stored in Redux).
+
+If you, supply just a string as in `types.login`, only the chunk for the matching route will be called (since thunks wouldn't know what to fetch without precise params/etc).
 
 
 ## Serve Split Chunks w/ SSR
@@ -392,7 +399,7 @@ SSR is challenging. Code Splitting is challenging.
 
 SSR + Splitting unfortunately is greater than the sum of its parts, which is to say ***combination SSR + Splitting*** **is many times more challenging.** 
 
-With Respond it's *just* a matter of passing the `request` `url` and `awaiting` your `firstRoute()`. 
+With Respond it's *just* a matter of passing the `request` `url` and *awaiting* your `firstRoute()`. 
 
 
 *server/configureStore.js:*
@@ -404,7 +411,7 @@ export default async function configureStore(request) {
     initialEntries: [request.url]
   }
 
-  const { firstRoute, store } = createApp(config, options) // default middleware used
+  const { firstRoute, store } = createApp(config, options)
 
   await store.dispatch(firstRoute())
 
@@ -429,13 +436,22 @@ export default async function serverRender(req, res) {
 
   // like this:
 
-  const scripts = store.getState().location.chunks.map(chunk => {
-    return `<script src="/static/${chunk}.js" />`
+  const { chunks } = store.getState().location
+
+  const stylesheets = chunks.map(chunk => {
+    return `<link rel='stylesheet' href='/static/${chunk}.css' />`
+  }).join(' ')
+
+  const scripts = chunks.map(chunk => {
+    return `<script src='/static/${chunk}.js' />`
   }).join(' ')
 
   return res.send(
     `<!doctype html>
       <html>
+        <head>
+          ${stylesheets}
+        </head>
         <body>
           <div id="root">${appString}</div>
           <script>window.RESPOND_STATE = ${stateJson}</script>
@@ -458,10 +474,10 @@ app.get('*', serverRender)
 http.createServer(app).listen(3000)
 ```
 
-Yes, we wrote the book when it comes to routing, splitting and SSR in a Redux world. *Respond Framework* is the direct heir to:
+Yes, we wrote the book when it comes to routing, splitting and SSR, especially in a Redux world. ***Respond Framework*** **is the direct heir to:**
 
-- [faceyspacey/redux-first-router](https://github.com/faceyspacey/redux-first-router) and 
-- [faceyspacey/react-universal-component](https://github.com/faceyspacey/react-universal-component)
+- **[faceyspacey/redux-first-router](https://github.com/faceyspacey/redux-first-router)** and 
+- **[faceyspacey/react-universal-component](https://github.com/faceyspacey/react-universal-component)**
 
 
 

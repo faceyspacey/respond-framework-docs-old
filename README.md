@@ -42,7 +42,7 @@ More on this later...
 
 ## Modular (did I hear you say "Redux Modules"??)
 
-Respond Framework is modular and encapsulated like React components, but at a higher level. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off and build with confidence that what they bring back will plugin nicely.
+Respond Framework is modular and encapsulated like React components, but at a higher level. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off and build with the confidence that what they bring back will plug in nicely.
 
 Your app is composed of *Respond Modules*, which encapsulate **routes**, **components**, **reducers** and everything else you may need. `moduleProps` allow you to share `state`, `actions`, and `types` between parent modules and their children.
 
@@ -96,12 +96,12 @@ const { firstRoute, store } = createApp({
 
 ```js
 import { createModule } from 'respond-framework'
-import { foo, bar } from './reducer'
-import components from './components'
+import { session } from './reducer'
+import { Dash, Metrics, Stats } from './components'
 
 export default createModule({
-  reducers: { foo, bar },
-  components,
+  reducers: { session },
+  components: { Dash, Metrics, Stats },
   routes: {
     main: '/',
     metrics: '/metrics',
@@ -121,7 +121,7 @@ Trust us, the React team has you brainwashed--side-effects don't belong in your 
 
 ```js
 export default createModule({
-  reducers: { foo, bar },
+  reducers,
   components,
   routes: {
     main: {
@@ -138,7 +138,7 @@ export default createModule({
 
 ```js
 export default createModule({
-  reducers: { foo, bar },
+  reducers,
   components,
   routes: {
     main: {
@@ -162,7 +162,7 @@ export default createModule({
 import mixpanel from 'mixpanel'
 
 export default createModule({
-  reducers: { foo, bar },
+  reducers,
   components,
   routes: {
     main: {
@@ -185,7 +185,7 @@ export default createModule({
 
 ```js
 export default createModule({
-  reducers: { foo, bar },
+  reducers,
   components,
   routes: {
     main: {
@@ -214,7 +214,7 @@ export default createModule({
 
 ```js
 export default createModule({
-+  reducers: { foo, bar, acceptedCookies },
++  reducers: { session, acceptedCookies },
   components,
   routes: {
     main: {

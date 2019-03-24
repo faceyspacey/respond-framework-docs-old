@@ -115,9 +115,17 @@ export default createModule({
 
 ## Predictable Linear Effects
 
-No longer leave side-effects up to random discovery in your component tree!  ["No surprises == better sleep"](https://twitter.com/faceyspacey/status/1107057805507227649). Instead orchestrate them linearly once per route. 
+No longer leave side-effects up to random discovery in your component tree!  
 
-Trust us, the React team has you brainwashed--side-effects don't belong in your components, even with hooks :)
+> ["No surprises == better sleep"](https://twitter.com/faceyspacey/status/1107057805507227649) -Anton Korzunov (maintainer of React-Hot-Loader, react-imported-component)
+
+Instead orchestrate them linearly once per route. 
+
+Trust us, React is great--**why do you think** ***Respond*** **is built on top of it**--but that doesn't mean every approach the React team promotes is spot on. Side-effects don't belong in your components, even with hooks :)
+
+
+### Here's how we roll:
+
 
 ```js
 export default createModule({

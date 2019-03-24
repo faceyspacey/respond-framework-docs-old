@@ -100,7 +100,7 @@ import { session } from './reducer'
 import { Dash, Metrics, Stats } from './components'
 
 export default createModule({
-  reducers: { session },
+  reducers: { foo, bar },
   components: { Dash, Metrics, Stats },
   routes: {
     main: '/',
@@ -327,8 +327,15 @@ reducers: {
 And components:
 
 ```js
-const RespondComponent = (props, state, actions) => <Button onClick={actions.login} />
+const LoginButton = (props, state, actions) => {
+  return (
+    <div>
+      <button onClick={actions.login}>LOGIN</button>
+    </div>
+  )
+}
 ```
+
 
 Because *Respond Modules* are guaranteed to be unaware of the outside world **(even though they're conveniently using the same store)**, `actions`, `types` and `state` must be injected by the framework. This allows Respond to transparently normalize namespace access under the hood via proxies, so you only have to use namespaces where you absolutely must, which brings up an important point:
 
@@ -393,7 +400,7 @@ If you provide a precise action, both the chunk *and callbacks such as thunks* w
 If you, supply just a string as in `types.login`, only the chunk for the matching route will be called (since thunks wouldn't know what to fetch without precise params/etc).
 
 
-## Serve Split Chunks w/ SSR
+## Serve Chunks w/ SSR
 
 SSR is challenging. Code Splitting is challenging.
 
@@ -431,12 +438,13 @@ import App from '../src/components/App'
 export default async function serverRender(req, res) {
   const store = await configureStore(req)
 
+  const state = store.getState()
   const appString = ReactDOM.renderToString(<Provider store={store}><App /></Provider>)
-  const stateJson = JSON.stringify(store.getState())
+  const stateJson = JSON.stringify(state)
 
   // like this:
 
-  const { chunks } = store.getState().location
+  const { chunks } = state.location
 
   const stylesheets = chunks.map(chunk => {
     return `<link rel='stylesheet' href='/static/${chunk}.css' />`
@@ -474,6 +482,9 @@ app.get('*', serverRender)
 http.createServer(app).listen(3000)
 ```
 
+SSR with *Respond* doesn't lock you into a *"walled garden"* (like other solutions) for how to manage your application's server. You can use Express, Koa, Node, Babel and Webpack as you normally would.
+
+
 Yes, we wrote the book when it comes to routing, splitting and SSR, especially in a Redux world. ***Respond Framework*** **is the direct heir to:**
 
 - **[faceyspacey/redux-first-router](https://github.com/faceyspacey/redux-first-router)** and 
@@ -485,12 +496,12 @@ Yes, we wrote the book when it comes to routing, splitting and SSR, especially i
 
 Internally, our state management library is called *Remixx*, but it's ok if you continue to call it *"Redux"* :)
 
-"Redux Modules"--*you know the ones the community never figured out how to make*--was always about components. The idea is that you can provide a pairing of Redux assets (reducers, actions, types) and components in a format that you can share with 3rd parties, such as on NPM, without naming conflicts. In other words: **mini apps**. *It would have been nice, but when was the last time you saw Redux-based components on NPM??* **Never until now.**
+"Redux Modules"--*you know the ones the community never figured out how to make*--was always about components. The idea is that you can provide a pairing of Redux assets (reducers, actions, types) and components in a format that you can share with 3rd parties without naming conflicts (such as through NPM). In other words: **mini apps**. *It would have been nice, but when was the last time you saw Redux-based components on NPM??* **Not usefully now.**
 
 While making this possible, we took the liberty to build in exactly what you might expect into React. Here's what *Respond components* look like:
 
 ```js
-const LoginButon = (props, state, actions) => !state.session && <Button onClick={actions.login} />
+const LoginButton = (props, state, actions) => !state.session && <Button onClick={actions.login} />
 ```
 
 **`state` and `actions` are passed as arguments in addition to props!** 
@@ -499,7 +510,7 @@ Actions are automatically bound to `dispatch` and there's never any need for `ma
 
 > Yes, *Respond* is built for the era where you assume your users' browsers support proxies.
 
-The transformation of your components to support this interface is done via Babel, therefore if you don't happen to use `state` or `actions`, your components will be left untouched. You're free to use hooks, side effects, you name it (though we recommend keeping your side-effects in *Respond* routes).
+The transformation of your components to support this interface is done via Babel, therefore if you don't happen to use `state` or `actions`, your components will be left untouched. You're free to use hooks, side effects, you name it (though we recommend keeping your side-effects in *Respond* routes, especially if you're doing SSR).
 
 
 ## Automatic Namespacing
@@ -507,7 +518,17 @@ The transformation of your components to support this interface is done via Babe
 If you saw:
 
 ```js
-const MetricsButton = (props, state, actions) => !state.foo && <Button onClick={actions.metrics} />
+import { Link, createModule } from 'respond-framework'
+
+const MetricsButton = (props, state, actions) => {
+  const text = state.foo ? 'Go To Metrics' : 'metrics' // contrived example
+
+  return (
+    <div>
+      <Link to={actions.metrics}>{text}</Link>
+    </div>
+  )
+}
 
 export default createModule({
   reducers: { foo, bar },
@@ -528,13 +549,19 @@ export default createModule({
 })
 ```
 
-and were wondering how `actions.metrics` and `state.foo` was guaranteed to be unique if this component was part of a module on NPM, you'd be a keen observer.
+and were wondering how `actions.metrics` and `state.foo` was guaranteed to be unique if this component was part of a module on NPM, *you'd be a keen observer.*
 
 Under the hood (within the `state` and `actions` proxies) here's what's actually being called:
 
 ```js
-const LoginButon = (props, state, actions) => {
-  return !state.dashboard.foo && <Button onClick={actions.dashboard.metrics} />
+const MetricsButton = (props, state, actions) => {
+  const text = state.dashboard.foo ? 'Go To Metrics' : 'metrics'
+
+  return (
+    <div>
+      <Link to={actions.dashboard.metrics}>{text}</Link>
+    </div>
+  )
 }
 ```
 
@@ -553,6 +580,16 @@ dashboad: {
 
 > The parent route type, `DASHBOARD` doubles as the module's namespace for nested routes
 
+
+
+
+## Module Props
+
+Modules can receive `props` just like components can. The purpose is different though: 
+
+- **`moduleProps` serve the purpose of aliasing existing state coming from parent modules**
+- **and therefore keep all state in a** ***single easily time-travellable + testable store*** 
+
 Here's how you tell the `dashboard` module about pre-existing state and actions in the parent:
 
 ```js
@@ -565,18 +602,57 @@ dashboad: {
 +    },
 +    actions: {
 +      login: 'login'
++    },
++    types: {
++      CLOSE: 'HOME'
 +    }
 +  }
 }
 ```
 
-> So `getState().user` will be made available through the `state` proxy at `state.session` and the `login` action will simply be passed down by the same name (since that's what the child module's documentation also said was the name).
+> So `getState().user` will be made available through the `state` proxy at `state.session` and the equivalent for `actions.login` in the `actions` proxy. It's just coincidence that the child module documents an expected action by the same name of `login`.
 
+
+## Module Parameterization 
+
+At the end of the day component `props` are just parameters. Our modules also can be parameterized. The difference from `moduleProps` is that there is no special behavior under the hood. 
+
+If you wanted to choose paths used in a child module from the parent, here's how you would do it:
+
+
+```js
+import { createModule } from 'respond-framework'
+
+export default createModule((options) => ({
+  routes: {
+    OPEN_CART: {
+      // path: '/cart',
+      path: options.openCartPath, // yes, groundbreaking
+      thunk: ({ stripe, payload }) => stripe.findCartItems(payload)
+    },
+    CHARGE: {},
+    CONFIRMATION: {}
+  }
+}))
+```
+
+*parent module/app:*
+
+```js
+CHECKOUT: {
+  load: async () => {
+    const module = await import('respond-stripe-cart')
+    return module({ openCartPath: '/all-i-do/is-win' })
+  }
+}
+```
+
+*Batteries not included*
 
 
 ## Modules, Nesting, Splitting, Oh My!
 
-The cornerstone of Respond's flawless interface is one thing: **the collapsing of many capabilities into our core "modules" feature.** 
+The cornerstone of Respond's pristine interface is one thing: **the collapsing of many capabilities under one interface:** ***Respond Modules.*** 
 
 Let's take a look at how dynamically imported routes look like after being merged:
 
@@ -587,11 +663,12 @@ Let's take a look at how dynamically imported routes look like after being merge
 routes: {
   dashboard: {
     path: '/dashboard',
+    thunk: ({ api }) => api.fetch('user'),
     load: () => import('../modules/dashboard'),
   }
 }
 
-// child module:
+// child dashboard module:
 routes: {
   metrics: '/metrics',
   stats: '/stats'
@@ -612,7 +689,7 @@ routes: {
 }
 ```
 
-As you can see, modules, path nesting, and code splitting are all **collaped** into a single unified interface.
+As you can see, modules, path nesting, and code splitting are all **collapsed** into a single unified interface.
 
 But that's not all, the `thunk` above has a special characterstic we call **"callback nesting"**: 
 
@@ -657,7 +734,7 @@ routes: {
 }
 ```
 
-> In essence, the route nesting is being used just for callback nesting + module namespacing; `actions.dashboard()` doesn't exist!
+> In essence, the route nesting is being used just for callback nesting + module namespacing; usually you can visit: `actions.dashboard()`, since the namespace doubles as its own route; in this case you can't. 
 
 
 
@@ -680,7 +757,7 @@ routes: {
 > This allows you to dispatch `actions.dashboard()` and reach an independent route as you originally could, while allowing for child routes to be unprefixed. It's a hybrid of the previous ones.
 
 
-### Merge child route into parent:
+### Merge single child route into parent:
 
 ```js
 // pre-import:
@@ -691,8 +768,8 @@ dashboard: {
 
 // dashboard module:
 routes: {
-  main: {
-    path: '/',
+  entry: {
+    path: '/foo/:param',
     thunk: ({ api }) => api.fetch('user'),
   }
 }
@@ -700,19 +777,60 @@ routes: {
 //post-import:
 routes: {
   dashboard: {
-    path: '/dashboard',
+    path: '/dashboard/foo/:param',
     thunk: ({ api }) => api.fetch('user'),
-    alias: 'main',
   }
 }
 ```
 
-> If a child route has a path of `'/'` it's assumed that the goal of code-splitting in this case is to merge the route capabilities into the parent. The child will have refered to this action by, in this case, `main`, so it's specified as an alias, resulting in `actions.dashboard()` being the action creator available in parent routes and `actions.main()` within the child module itself.
+> If a child route is named `entry` it will be merged into the parent, and it's path appended to the parent's. Within itself the child must refer to this action as `entry` obviously. 
 
-This pattern can be very useful for splitting single routes as above, but could have also brought along additional nested routes as before.
+> NOTE: no additional routes at the same level as `entry` are allowed. You can nest them further though.
+
 
 ## Reducers & Selectors
 
+In *Respond*, selectors are also passed at time of store creation. In addition, both reducers and selectors are automatically combined.
+
+```js
+export default createModule({
+  reducers: { foo, bar },
+  selectors: {
+    visibleCurrentItems: (state, before, after) => {
+      const items = state.items[state.filter]
+      return items.filter(item => item.date < before && item.date > after)
+    }
+  },
+  etc
+})
+```
+
+What gives?
+
+The difference between reducers and selectors is:
+
+- selectors have access to all those isolated reducers *and* other selectors. 
+- selectors are often intended to be used with arguments from components (i.e. `props`)
+
+Which is why it makes a whole lot of sense, in a world where you're no longer doing the `mapStateToProps` rigamarole, to have functions on your `state` object, a la:
+
+```js
+const ItemsList = (props, state) => {
+  const items = state.visibleCurrentItems(props.before, props.after)
+
+  return (
+    <div>
+      {items.map(item => (
+        <h1>{item.title}</h1>
+        <p>{item.blurb}</p>
+      ))}
+    </div>
+  )
+}
+```
+
+
+> As far as perf, we automated render trigger/blocking like with reducers, using a combination of usage tracking + caching. Unlike the days of *reselect*, a single selector automatically works across multiple components. Think of your `state` object, containing both reducers + selectors, as your **UI Database**.
 
 
 

@@ -1,5 +1,8 @@
 # Respond Framework Walkthrough
 
+
+![Respond Framework Homepage](./docs/images/respond-homepage.png)
+
 Respond Framework is what happens if you build Redux & first-class concerns for routing into React, plus take a page from the traditional server-side MVC playbook when it comes to side-effects. 
 
 
@@ -14,14 +17,34 @@ yarn add 'respond-framework'
 ```
 
 
-![Respond Framework Homepage](./docs/images/respond-homepage.png)
+## "Redux Components"
+
+For a taste of where we're going, behold:
+
+```js
+function LoginComponent(props, state, actions) => {
+  const onClick = state.session ?  actions.logout : actions.login
+  const text = state.session ? 'LOGOUT' : 'LOGIN'
+
+  return (
+    <div>
+      <button onClick={actions.login}>{text}</button>
+    </div>
+  )
+}
+```
+
+Gone are the days of `connect` + `mapState/DispatchToProps`. Had the additional args been left out, Babel would have compiled no alterations under the hood.
+
+More on this later...
+
 
 
 ## Modular (did I hear you say "Redux Modules"??)
 
 Respond Framework is modular and encapsulated like React components, but at a higher level. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off and build with confidence that what they bring back will plugin nicely.
 
-Your app is composed of *Respond Modules*, which encapsulate routes, components, and reducers. `moduleProps` allow you to share `state`, `actions`, and `types` between parent modules and their children.
+Your app is composed of *Respond Modules*, which encapsulate **routes**, **components**, **reducers** and everything else you may need. `moduleProps` allow you to share `state`, `actions`, and `types` between parent modules and their children.
 
 
 *src/modules/app/index.js*

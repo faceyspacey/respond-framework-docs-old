@@ -134,7 +134,7 @@ export default createModule({
   routes: {
     main: {
 +      path: '/',
-+      thunk: ({ api }) => api.fetch('items')
++      thunk: ({ api }) => api.get('items')
     },
     metrics: '/metrics',
     stats: '/stats'
@@ -152,7 +152,7 @@ export default createModule({
     main: {
       path: '/',
 +      thunk: async ({ api, dispatch, types }) => {
-+        const payload = await api.fetch('items')
++        const payload = await api.get('items')
 +        dispatch({ type: types.main.COMPLETE, payload })
       }
     },
@@ -175,7 +175,7 @@ export default createModule({
   routes: {
     main: {
       path: '/',
-      thunk: thunk: ({ api }) => api.fetch('items')
+      thunk: thunk: ({ api }) => api.get('items')
     },
     metrics: '/metrics',
     stats: '/stats'
@@ -198,7 +198,7 @@ export default createModule({
   routes: {
     main: {
       path: '/',
-      thunk: thunk: ({ api }) => api.fetch('items')
+      thunk: thunk: ({ api }) => api.get('items')
     },
     metrics: '/metrics',
     stats: '/stats'
@@ -227,7 +227,7 @@ export default createModule({
   routes: {
     main: {
       path: '/',
-      thunk: ({ api }) => api.fetch('items'),
+      thunk: ({ api }) => api.get('items'),
 +      onLeave: ({ getState }) => !getState().acceptedCookies // return false to block route change
     },
     metrics: '/metrics',
@@ -277,46 +277,70 @@ For example, we can bail out at any time (before or after `enter`). We have even
 
 ## Generated Action Creators & Types
 
-Your `routes` object generates all the action types your application needs. For example in the current app, so far we have:
+Your `routes` object generates all the action types your application needs. So for these routes:
 
-- `actions.home()`
-- `actions.login()`
-- `actions.dashboard()`
-- `actions.dashboard.metrics()`
-- `actions.dashboard.stats()`
-
-As well as the following for each route:
-
-- `actions.home.complete()`
-- `actions.home.error()`
-- `actions.dashboard.metrics.complete()`
-- etc
-
-
-The types generated are just the capitalized snake_cased versions of these prefixed by their namespaces:
-
-- `HOME`
-- `LOGIN`
-- `DASHBOARD`
-- `DASHBOARD/METRICS`
-- `DASHBOARD/STATS`
-
-And:
-
-- `HOME_COMPLETE`
-- `HOME_ERROR`
-- `DASHBOARD/METRICS_COMPLETE`
-- etc
-
-They are accessible in their lowercased form at, for example: `types.home` or `actions.home.type`.
-
-Along with `state`, they are **injected** into callbacks:
 
 ```js
-thunk: ({ types, actions, state }) => 
+const routes = {
+  HOME: '/',
+  CHECKOUT_STEP_1: '/checkout/step-1',
+  CHECKOUT_STEP_2: '/checkout/step-2',
+  DASHBOARD: {
+    path: '/dashboard',
+    load: () => ({ // typically code-split
+      routes: {
+        METRICS: '/metrics',
+        STATS: '/stats'
+      }
+    })
+  }
+}
 ```
 
-Into reducers:
+The following camelCased creators will be generated:
+
+| Action Creator | Dispatched Type | 
+| --- | --- |
+| `actions.home()` | `type: 'HOME'`| 
+| `actions.checkoutStep1()` | `type: 'CHECKOUT_STEP_1'`|
+| `actions.checkoutStep2()` | `type: 'CHECKOUT_STEP_1'`| 
+| `actions.dashboard()` | `type: 'DASHBOARD'`|
+| `actions.dashboard.metrics()` | `type: 'DASHBOARD/METRICS'`| 
+| `actions.dashboard.stats()` | `type: 'DASHBOARD/STATS'`|
+
+> the route type `DASHBOARD` becomes the namespace for nested routes/modules
+
+
+### Additional Action Creators
+
+For each route you also get several additional action creators. Let's take `HOME` as an example:
+
+
+| Action Creator | Dispatched Type | 
+| --- | --- |
+| `actions.home.complete()` | `type: 'HOME.COMPLETE'`| 
+| `actions.home.error()` | `type: 'HOME.ERROR'`|
+| `actions.home.start()`* | `type: 'HOME.START'`| 
+
+> **see [call({ start: true })]('./docs/call-middleware.md#start') for when you might use `START`*
+
+
+### Injections 
+
+Because *Respond Modules* are guaranteed to be unaware of the outside world **(even though they're conveniently using the same store)**, `actions`, `types` and `state` must be injected by the framework. 
+
+This allows Respond to transparently normalize namespace access under the hood via proxies, so you only have to use namespaces where you absolutely must. Let's take a look at where `actions` appear:
+
+
+***callbacks:***
+
+```js
+MY_ROUTE: {
+  thunk: ({ actions }) => ...,
+} 
+```
+
+***reducers (as `types`):***
 
 ```js
 reducers: {
@@ -324,22 +348,296 @@ reducers: {
 }
 ```
 
-And components:
+***components:***
 
 ```js
-const LoginButton = (props, state, actions) => {
-  return (
-    <div>
-      <button onClick={actions.login}>LOGIN</button>
-    </div>
-  )
+const MyComponent = (props, state, actions) =>
+  <Button onClick={actions.home()} />
+```
+
+
+> NOTE: **Actions, state and types from child modules are available in parent components by their namespace.** Whereas child modules must use `moduleProps` to access the same from the parent. In other words, parents get to know whats up with their children, but not the other way around *(kind of like in real life :)*
+
+
+
+### Dispatching
+
+Dispatching route actions offer some conveniences. Imagine we have this route:
+
+```js
+MY_ENTITY: '/entity/:slug',
+```
+
+You could dispatch that as an action without the type:
+
+```js
+const v = {
+  params: { slug: 'dope-stuff' },
+  query: { foo: 'bar' },
+}
+
+actions.myEntity(action)
+```
+
+Or if you only needed the params, Respond offers a bit of automation:
+
+```js
+const params = { slug: 'dope-stuff' }
+actions.myEntity(params)
+```
+
+Respond will detect any object that doesn't have any of the action keys as just the `params`.
+
+
+
+### Dispatching Complete
+
+The returns of callbacks are automatically dispatched, assigned to the payload like so:
+
+```js
+MY_ENTITY: {
+  path: '/entity/:slug',
+  thunk: ({ api }, { params }) => api.get(`entity/${slug}`)
+}
+```
+
+The exact action dispatched will be: `{ type: 'MY_ENTITY.COMPLETE', payload: [...itemsReturned] }`
+
+
+To dispatch that manually you would do:
+
+```js
+MY_ENTITY: {
+  path: '/entity/:slug',
+  thunk: async ({ api }, { params }) => {
+    const { items } = await api.get(`entity/${slug}`)
+    actions.myEntity.complete(items)
+  }
 }
 ```
 
 
-Because *Respond Modules* are guaranteed to be unaware of the outside world **(even though they're conveniently using the same store)**, `actions`, `types` and `state` must be injected by the framework. This allows Respond to transparently normalize namespace access under the hood via proxies, so you only have to use namespaces where you absolutely must, which brings up an important point:
+### Dispatching Errors
 
-**Actions, state and types from child modules is available in parent components by their namespace.** Whereas child modules must use `moduleProps` to access the same from the parent. In other words, parents get to know whats up with their children, but not the other way around *(kind of like in real life :)*
+Now say you had an error:
+
+
+```js
+MY_ENTITY: {
+  path: '/entity/:slug',
+  thunk: async ({ api }, { params }) => {
+    const { items, error } = await api.get(`entity/${slug}`)
+    
+    if (error) {
+      actions.myEntity.error(new Error('explosion'))
+    }
+
+    actions.myEntity.complete(items)
+  }
+}
+```
+
+The error type `MY_ENTITY.ERROR` would be dispatched like so:
+
+```js
+{ type: 'MY_ENTITY.ERROR', error: new Error('explosion') }
+```
+
+And you could retreive both from state at:
+
+```js
+state.location.errorType
+state.location.error
+```
+
+Respond will also internally dispatch error actions if anything goes wrong. In *that case* `onError` callbacks you have on the route (or globally in your options) will be called. Checkout the [onError option](./docs/advanced-options.md#onerror-request-action-) to learn more.
+
+
+
+### Binding Not Necessary
+
+In components and route callbacks (which you saw above), actions are pre-bound to dispatch, so you never have to think about all the different ways it could be in *react-redux* (e.g. `bindActionCreators`, etc)
+
+So never expect do see `dispatch`:
+
+```js
+const MyComponent = (props, state, actions) =>
+  <Button onClick={() => props.dispatch(actions.home())} />
+```
+
+Instead you do just:
+
+```js
+const MyComponent = (props, state, actions) =>
+  <Button onClick={actions.home()} />
+```
+
+Or if you had to pass arguments, you would get automatic memoization:
+
+```js
+const MyComponent = ({ arg }, state, actions) =>
+  <Button onClick={actions.myEntity({ slug: arg })} />
+```
+
+That's because, `home()` returns a memoized function reference that only changes if the arguments change. It's a minor automation over doing the following in *Modern React*:
+
+```js
+import { useCallback } from 'react'
+
+const MyComponent = ({ arg }, state, actions) =>
+  <Button onClick={useCallback(() => actions.myEntity( slug: arg }), [arg])} />
+```
+
+In both, a new function reference will be returned only if `arg` changes, improving your perf by short-circuiting unecessary renders. 
+
+
+***What about in callacks?***
+
+Respond knows when your action creators are being called in render *vs* in callbacks like this:
+
+
+```js
+const MyComponent = ({ arg1, arg2 }, state, actions) => {
+  const handler = () => {
+    // do something else
+    actions.home()
+  }
+
+  return <Button onClick={handler} />
+}
+```
+
+Therefore, you don't have to do this:  `actions.home()()`
+
+
+### Usage w/ `<Link />`
+
+However, the **recommended way to dispatch actions with Respond** is with the `<Link />` component. 
+
+```js
+import Link from 'respond-framework/Link'
+
+const MyComponent = (props, state, actions) =>
+  <Link action={actions.home} />
+```
+
+Given Respond is conducive to URLizing every state--and not to mention its automation of SSR--there's no reason you shouldn't use *real links* to dispatch all actions. 
+
+Even in the private members areas of your apps where SEO is not an issue, links offer you many benefits:
+
+- better accessibility
+- visited coloring
+- right click capability  *(open in new tab, etc)*
+- **100% automated testing capabilities** 
+- works fine with **React Native**, bringing the same automated testing capabilities there too
+
+
+
+### Enhanced Testing w/ `<Link />` and `snapActions`
+
+The Respond's `snapActions` test utility offers a 100% automated way of writing tests by simple dumps of actions from the Redux devtools. Typically you couldn't get tests this comprehensive without writing browser automation/scraping code, which is never fun, not automatic, and redundant in terms of actual app code you already wrote. 
+
+Wierdly enough, we are able to fulfill the *ambition of complete automation* through snapshotting actual `hrefs` on the page (eg: `<a href='/' />`). This is something hidden handlers/actions cannot provide. The idea is: 
+
+- **if the next action in the array matches a link with the given url/href on the page, the test runner can safely continue.**
+
+Here's what usage of Respond's `snapActions` test runner looks like:
+
+
+```js
+import { snapActions } from 'respond-framework/test'
+import actions from './action-sequences'
+import { App, config, options } from '../src'
+
+test('my whole app', async () => {
+  // called under the hood: createApp(config, options) + React.render(App)
+  await snapActions(actions, App, config, options)
+})
+```
+
+`snapActions` dispatch each action in the `actions` array one by one, followed by a snapshot of the resulting JSX and the resulting state:
+
+It **confirms it can dispatch the next action by the presence of the corresponding url/href in the JSX; no recording clicks necessary!**
+
+If an action with a corresponding URL does not appear in the JSX, the test will fail. 
+ 
+Say good bye to slow end-to-end tests with Respond (at least while you're working and want fast results). 
+ 
+Lastly, the same `snapActions` can open a real browser using [Cypress](https://www.cypress.io), puppeteer or similar. So we have you covered in both situations. Take a look:
+
+
+```js
+import { snapActions } from 'respond-framework/test'
+import actions from './action-sequences'
+import { App, config, options } from '../src'
+
+test('my whole app', async () => {
+  await snapActions(actions, App, config, options, {
+    visit: (url) => cy.visit(url),
+    snapHtml: () => cy.get('html').snapshot(),
+    snapPhoto: (filename) => cy.screenshot(filename)
+  })
+})
+```
+
+Typically, end-to-end tests are used during CI, and Jest snapshots while you're working, using a fast continuous test-runner like [Wallaby](https://wallabyjs.com).
+
+
+### Custom Action Creators
+
+On your routes you can also provide custom action creators like so:
+
+```js
+MY_ENTITY: {
+  path: '/entity/:slug',
+  actions: {
+    go: slug => ({ params: { slug }}),
+    another: (slug, state) ({ params: { slug }, state }),
+  }
+}
+```
+
+Now you will also have:
+- `actions.myEntity.go(slug)`
+- `actions.myEntity.another(slug, state)`
+
+This simplifes the passing of args wherever you call these action creators. You don't have to recreate: 
+
+- `{ params: { slug } }`
+- `{ params: { slug }, state }`
+
+
+### `actions.notFound`
+
+Respond provides a built-in `NOT_FOUND` action type at the top level of your app. If a route is ever not found, this action type will be dispatched. You can also override it at any level of your modules hierarchy. Respond will dispatch the  `NOT_FOUND` type namespaced to the closest module that has one. 
+
+You can put callbacks on it like you would any other route:
+
+```js
+const routes = {
+  NOT_FOUND: {
+    onEnter: () => alert('oops')
+  }
+}
+```
+
+If Respond can't find a route dispatched, `/not-found` will be the path set in the address bar. You can override that like any other route:
+
+```js
+const routes = {
+  NOT_FOUND: {
+    path: '/fail-whale',
+    onEnter: () => alert('oops')
+  }
+}
+```
+
+If you choose to dispatch `NOT_FOUND` when something goes wrong (which is a fine pattern), this path will also be used.
+
+However, if the URL in the route transition was pre-determined (such as from a direct visitor), but no matching route found, the URL will stay the same in the address bar, *while dispatching the `NOT_FOUND` type.* This is preferable in this case.
+
+
+Lastly, `actions.notFound.complete` and other additional generated action creators also exist. There's very little different between `NOT_FOUND` and other routes, except Respond directs your users here as a fallback when things go wrong (and insures you have at least one of these routes).
 
 
 
@@ -390,7 +688,7 @@ routes: {
   },
   profile: {
     path: '/profile/:slug',
-    thunk: ({ api, params }) => api.fetch(`users/${params.slug}`)
+    thunk: ({ api, params }) => api.get(`users/${params.slug}`)
   }
 }
 ```
@@ -623,17 +921,17 @@ If you wanted to choose paths used in a child module from the parent, here's how
 ```js
 import { createModule } from 'respond-framework'
 
-export default createModule((options) => ({
+export default options => createModule({
   routes: {
     OPEN_CART: {
       // path: '/cart',
-      path: options.openCartPath, // yes, groundbreaking
+      path: options.openCartPath, // <--
       thunk: ({ stripe, payload }) => stripe.findCartItems(payload)
     },
     CHARGE: {},
     CONFIRMATION: {}
   }
-}))
+})
 ```
 
 *parent module/app:*
@@ -663,7 +961,7 @@ Let's take a look at how dynamically imported routes look like after being merge
 routes: {
   dashboard: {
     path: '/dashboard',
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
     load: () => import('../modules/dashboard'),
   }
 }
@@ -680,7 +978,7 @@ routes: {
 routes: {
   dashboard: {
     path: '/dashboard',
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
     routes: {
       metrics: '/metrics',  // reified path /dashboard/metrics
       stats: '/stats'       // reified path /dashboard/stats
@@ -710,7 +1008,7 @@ routes: {
   dashboard: {
     path: '/dashboard',
     pathPrefix: '/something-else',
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
     routes: {
       metrics: '/metrics',  // reified path /something-else/metrics
       stats: '/stats'       // reified path /something-else/stats
@@ -725,7 +1023,7 @@ routes: {
 ```js
 routes: {
   dashboard: {
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
     routes: {
       metrics: '/metrics',  // reified path /metrics
       stats: '/stats'       // reified path /stats
@@ -745,7 +1043,7 @@ routes: {
   dashboard: {
     path: '/dashboard',
     pathPrefix: false,
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
     routes: {
       metrics: '/metrics',  // reified path /metrics
       stats: '/stats'       // reified path /stats
@@ -770,7 +1068,7 @@ dashboard: {
 routes: {
   entry: {
     path: '/foo/:param',
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
   }
 }
 
@@ -778,7 +1076,7 @@ routes: {
 routes: {
   dashboard: {
     path: '/dashboard/foo/:param',
-    thunk: ({ api }) => api.fetch('user'),
+    thunk: ({ api }) => api.get('user'),
   }
 }
 ```
@@ -839,11 +1137,220 @@ const ItemsList = (props, state) => {
 
 ## Action + Reducer Shape
 
-Having learned from [redux-first-router](https://github.com/faceyspacey/redux-first-router), *Respond* route actions and `location` state contain the richest set of info we could dream up. Our entire wishlist has been met.
+Having learned from [redux-first-router](https://github.com/faceyspacey/redux-first-router), *Respond* route `actions` and `location` reducer state contain the richest set of info we could dream up. Our entire wishlist has been met. Their shape is identical. Let's check it out:
 
-Actions look like this:
+```js
+{
+    type: 'ARTICLE',
+    namespace: 'blog',
 
-Location State stored in *Remixx* looks like this:
+    params: { slug: 'respond-rocks' },
+    query: {},
+    state: {},
+    hash: 'action-shape',
+    basename: 'en',
+
+    url: '/en/article/respond-rocks#action-shape',
+    pathname: '/article/respond-rocks',
+    search: '',
+
+    key: 123456,
+    index: 1,
+    length: 2,
+
+    entries: [
+      {
+        type: 'HOME',
+        namespace: 'blog',
+        params: {},
+        query: { referrer: 'your-blog-article' },
+        state: {},
+        hash: '',
+        basename: 'en',
+        key: 123456,
+        index: 0,
+      },
+      {
+        type: 'ARTICLE',
+        namespace: 'blog',
+        params: { slug: 'respond-rocks' },
+        query: {},
+        state: {},
+        hash: 'action-shape',
+        basename: 'en',
+        key: 123457,
+        index: 1,
+      }
+    ],
+
+    from: {}, // route redirected from
+    prev: {
+      type: 'HOME',
+      namespace: 'blog',
+      params: {},
+      query: { referrer: 'your-blog-article' },
+      state: {},
+      hash: '',
+      basename: 'en',
+      key: 123456,
+      index: 0,
+    },
+
+    n: 1, // 1 | -1 (numerical version of direction)
+    kind: 'push', // init | load | push | replace | back | next | reset | jump | set
+    direction: 'forward', // forward | backward
+
+    blocked: null,
+    pop: false,
+    status: 200,
+    ready: true
+  }
+}
+```
+
+## Request Shape:
+
+The middleware pipeline generates a `request` instance object each time an action runs through it. It has the following shape:
+
+```js
+{
+  ...options.inject, // eg: { api }
+
+  state: {},
+  location: {},
+
+  cache: {},
+  error: {},
+
+  title: '',
+
+  route: {
+    type: 'ARTICLE',
+    path: '/article/respond-rocks',
+    thunk: () => ...,
+  },
+  prev: {
+    type: 'HOME',
+    path: '/',
+  },
+
+  routes: {},
+  actions: {},
+  history: {},
+
+  // unique object per pipeline (though ref maintained in child redirect pipelines)
+  tmp: {
+    committed: true,
+    load: false,
+  },
+  
+  // same object reference across all requests
+  ctx: {
+    pending: false,
+    busy: true,
+  },
+
+  dispatch() {},
+  confirm() {},
+  block() {},
+  enter() {}
+}
+```
+
+> There are other keys on the `request` object which are used internally; disregard them as they are not part of the public API and could change
+
+Commonly you will access a `request` instance in a route callback like so:
+
+```js
+ARTICLE: {
+  path: '/article/:slug',
+  thunk: (request, action) => {
+    const { api } = request
+    const { params } = action
+    return api.get(`article/${params.slug}`)
+  }
+}
+```
+
+## Submitting Forms
+
+Submitting forms follows a precise pattern with Respond. Instead of buttons linking to pathful routes, pathless routes are used to submit the form data, and on completion redirect to a pathful route.
+
+```js
+// imagine you're on /draft/my-article-on-how-dope-respond-is
+
+EDIT_DRAFT: {
+  path: '/draft/:slug',
+  thunk: ({ api }, { params }) => api.get(`draft/${params.slug}`)
+},
+
+
+// you click <Button onClick={actions.submitDraft} />
+
+SUBMIT_DRAFT: {
+  thunk: async ({ api }, { payload }) => {
+    const { success, message } = await api.post('article', payload)
+    return success ? actions.drafts() : actions.flash(message)
+  }
+},
+
+
+// and you end up back here
+
+DRAFTS: {
+  path: '/my-drafts',
+  thunk: ({ api }) => api.get('drafts') // token added to request headers by api instance
+}
+```
+
+
+## Login + Auth Token
+
+Login/Signup forms and receiving auth tokens follows a similar pattern to basic form usage:
+
+### example:
+
+```js
+// you're here:
+
+LOGIN: {
+  path: '/login',
+},
+
+
+// you click <LoginButton onClick={actions.submitLogin} />
+
+SUBMIT_LOGIN: {
+  thunk: async ({ api }, action) => {
+    const { email, password } = action.payload
+    const { success, message } = await api.login(email, password) // token received
+
+    return success ? actions.drafts() : actions.flash(message)
+  }
+},
+
+
+// and you end up at the main page of your private member area
+
+DRAFTS: {
+  path: '/my-drafts',
+  thunk: ({ api }) => api.get('drafts') // token applied to request headers by api instance
+}
+```
+
+The difference between regular form submits and login forms is: 
+
+- `api.login` should receive an auth token which it stores within the `api` instance
+- `api` automatically uses the token for subsequent requests, such as `api.get('drafts')`.
+
+The token should also be persisted in `localStorage` (or cookies if you're doing SSR),
+so you can pass it to your `api` instance during store creation.
+
+If you're app doesnt have SSR, you can use [redux-persist](https://github.com/rt2zz/redux-persist), and get it from there on store creation.
+
+
+> for an example of an Api class check our DI doc: [Dependency Injection + Api class example](./dependency-injection.md)
+
 
 
 ## Route Options
@@ -877,7 +1384,7 @@ Unless indicated by an *astersik* (\*) you can also expect them to work within t
 ### Default Values
 | name | arguments | return |
 | --- | --- | --- |
-| defaultParams | arg1, arg2| return foo|
+| defaultParams | arg1, arg2| return foo!|
 | defaultQuery | arg1, arg2| return foo|
 | defaultHash | arg1, arg2| return foo|
 | defaultState | arg1, arg2| return foo|
@@ -887,10 +1394,8 @@ Unless indicated by an *astersik* (\*) you can also expect them to work within t
 ### MISC
 | name | arguments | return |
 | --- | --- | --- |
-| praseSearch | arg1, arg2| return foo|
+| parseSearch | arg1, arg2| return foo|
 | stringifyQuery | arg1, arg2| return foo|
-| defaultHash | arg1, arg2| return foo|
-| defaultState | arg1, arg2| return foo|
 
 
 ### Matchers

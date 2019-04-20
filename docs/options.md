@@ -179,28 +179,6 @@ That means, they don't affect the action type. The same route/type can be visite
 
 
 
-## `parseSearch(string): object`
-
-Provide this option to customize how search strings are parsed. Here's how the default `parseSearch` is implemented:
-
-```js
-import qs from 'qs'
-
-const decoder = (str, decode) => isNumber(str) ? parseFloat(str) : decode(str)
-const isNumber = (str) => !isNaN(str) && !isNaN(parseFloat(str))
-
-export default (search) => qs.parse(search, { decoder })
-```
-
-
-## `stringifyQuery(Object): string`
-
-Provide this option to customize search strings are generated. Here's how the default `stringifyQuery` is implemented:
-
-```js
-import qs from 'qs'
-export default (obj) => qs.stringify(obj)
-```
 
 
 ## `initialEntries: Array<Entry>`
@@ -263,6 +241,30 @@ export default (request, response) => createModule(config, {
 
 This information is used to populate state for the previous route at `state.location.prev`. It also exists at the route level.
 
+
+
+## `parseSearch(string): object`
+
+Provide this option to customize how search strings are parsed. Here's how the default `parseSearch` is implemented:
+
+```js
+import qs from 'qs'
+
+const decoder = (str, decode) => isNumber(str) ? parseFloat(str) : decode(str)
+const isNumber = (str) => !isNaN(str) && !isNaN(parseFloat(str))
+
+export default (search) => qs.parse(search, { decoder })
+```
+
+
+## `stringifyQuery(Object): string`
+
+Provide this option to customize search strings are generated. Here's how the default `stringifyQuery` is implemented:
+
+```js
+import qs from 'qs'
+export default (obj) => qs.stringify(obj)
+```
 
 
 ## `save(locationState): void`

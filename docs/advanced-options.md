@@ -53,7 +53,7 @@ Before the Respond pipeline can pass your callbacks a `request`, it has to creat
 Here's how you can customize:
 
 ```js
-import Request from 'respond-framework/core'
+import { Request } from 'respond-framework/core'
 
 class AppRequest extends Request {
   performSpecialFeature() {
@@ -185,9 +185,12 @@ options.shouldTransition = (action, { routes }) => {
 
 ## `compose(middlewares, api, killOnRedirect = false) => (request): Promise<any>`
 
-`compose` should rarely be customized. It's the backbone of Respond. It's essentially the route transition runner. It's modeled after [koa compose](https://github.com/koajs/compose), but with lots of customizations for our routing use case. Such customizations revolve around redirects, short-circuiting (returning `false`) and special handling of the browser back/next buttons. It can get a bit complicated, but for the brave, here's how you customize:
+`compose` should rarely be customized. **Customize at your own risk.** 
+
+`compose` is the backbone of Respond. It's essentially the route transition runner. It's modeled after [koa compose](https://github.com/koajs/compose), but with lots of customizations for our routing use case. Such customizations revolve around redirects, short-circuiting (returning `false`) and special handling of the browser back/next buttons. It can get a bit complicated, but for the brave, here's how you customize:
 
 ```js
+import { compose } from 'respond-framework/core'
 import trackMixpanel from './middleware/track-mixpanel'
 
 export default (middlewares, api, killOnRedirect) => {
@@ -195,9 +198,13 @@ export default (middlewares, api, killOnRedirect) => {
 }
 ```
 
-Imagine you want to provide a custom `compose` to your team to use in modules, and guarantee that some middleware is applied everywhere, here's one way to do it.
+Imagine you want to provide a custom `compose` to your team to use in modules, and guarantee that some middleware is applied everywhere, that's one way to do it.
 
 If you want to completely customize `compose`, dig up the source and get to work. It's not recommended, but genius never is :)
+
+> The core is available like so in order to minimize friction related to forking. As easy as forking is, the additional hurdle often becomes the reason you never discover your genius solution. Contrary to popular approaches, we believe this is the correct philosophy for serious apps that are under *no illusion that custom apps won't call for custom solutions*. 
+
+> Feel free to explore new ways Respond can be molded. Respond is all about scaling large codebases of serious custom apps.
 
 
 
@@ -244,7 +251,7 @@ options.onError = null
 
 ## Additional Info:
 
-## `api` argument shape:
+- `api` argument shape:
 
 ```js
 { 
@@ -258,7 +265,7 @@ options.onError = null
 > `ctx` contains state that can be stored across requests.
 
 
-## `request` shape is documented [here](./request-shape.md)
+- `request` shape is documented [here](./request-shape.md)
 
 
 

@@ -1,6 +1,6 @@
 # Respond Component Patterns
 
-Respond's most **important** role--even more than routing and modularity--**is data fetching**. Most Respond apps do 100% of their data fetching at the route level, rather than as part of component side-effects. 
+Even more than routing and modularity, Respond's most **important role is data fetching**. Most Respond apps do 100% of their data fetching at the route level, rather than as part of component side-effects. 
 
 The predictability this strategy provides will greatly increase your productivity. Prepare to unlearn what you know regarding using components to do do such work.
 
@@ -12,11 +12,11 @@ The predictability this strategy provides will greatly increase your productivit
 
 The key to using a combination of store-connected components and standard React components is knowing where to draw the line between the two. In other words: how to expose the correct interface on *dumb React components* so *smart Respond components* can ***"drive"*** them .
 
-Driving dumb React components is based on 4 pillars:
+*Driving* dumb React components is based on 4 pillars:
 
-1. moving data-fetching to the route level
-2. passing simple values as props that tell the dumb component what to do
-3. dumb components only know about local state; smart parents bring in data from the store
+1. data-fetching is moved to the route level, avoiding entanglement with UI functionality
+2. handlers/actions passed down are not responsible for altering local state
+3. dumb components focus on local state; smart parents pass down data from the store
 4. ***reliable*** *transfer of control from external props to internal state*
 
 The last point is vital and can be addressed in several ways. Taking the token example of a `Modal`, let's examine the various ways this can be achieved.
@@ -91,15 +91,15 @@ const Modal = React.memo(({ visible, text, onClose, onSubmit }) => {
 })
 ```
 
-Going back to our 4 pillars, the key element is the `visible` prop:
+The key element is the `visible` prop. Let's check out how our 4 pillars panned out:
 
-1. the outter `SmartRespondModal` can get the value of this prop from anywhere, perhaps from fetching some data
-2. it's a simple value
-3. it becomes part of local state, whereas the parent received the data from the store
+1. the outter `SmartRespondModal` can get the value of the `visible` prop from anywhere, perhaps from fetching some data
+2. `onClose` and `onSubmit` are actions from the store, which are not required to perform double duty of also changing *visibility*; rather that's handled internally by the dumb *local component*
+3. `visible` becomes part of local state via `show`, whereas the parent received the data from the store
 4. there's *"reliable"* transfer of control from external props to local state using `useEffect` and `useState`
 
 
-There is one improvement we can make though--if `props.visible` changes, *it will run one more time than necessary*:
+There is one improvement we can make though. If `props.visible` changes, ***it will run one more time than necessary:***
 
 - 1st: when `props.visible` changes
 - 2nd: when `useEffect` calls `setVisible` after the previous render
@@ -113,7 +113,7 @@ useEffect(() => setVisible(visible), [visible])
 
 into a thin management layer. This isn't ideal, but it is standard hooks usage. Below we provide a strategy to avoid it. 
 
-This however suffices since the heavy work within `useMemo` is run only a single time (the 2nd time when the value of `show` has changed).
+Should you choose, this can suffice since the heavy work within `useMemo` is run only a single time (the 2nd time when the value of `show` has changed).
 
 
 ## 2) `React.memo` Strategy
@@ -157,9 +157,10 @@ Peformance is likely very similar, and it's a matter of preference. If we had to
 
 We also prefer this approach because it makes better separates concerns:
 
-- `Modal` clearly is a thin management layer of the primary variables, making use of hooks
-- `ModalInner` is an even dumber--though, performance wise, heavier--container of plain jsx
+- `Modal` clearly is a thin management layer, containing the primary variables and business logic
+- `ModalInner` is an even dumber component, which fits the role of a traditional "view"
 
+> NOTE: `close` and `submit` could have been wrapped in, for example, `useCallback(close, [onClose])` for an additional performance boost. If you had larger more complex component tree as you're likely to see in real apps, you'd want to do this. We couldn't do this with `useMemo` above because `useCallback` cannot be called within `useMemo`. The additional inner component strategy therefore has multiple benefits.
 
 ## 3) `getDerivedStateFromProps` Strategy
 
@@ -178,10 +179,10 @@ class Modal extends React.Component {
   }
 
   static getDerivedStateFromProps(props, state) {
-    if (props.visible !== state.propsVisible) {
+    if (props.visible !== state.propsVisible) { // notice the outside prop tracked, not internal state
       return {
         visible: props.visible,
-        propsVisible: props.visible // a little bit wonky to duplicate `visible` prop, but its stable
+        propsVisible: props.visible // a little bit wonky to duplicate `visible` prop, but it's stable
       }
     }
 
@@ -214,16 +215,19 @@ class Modal extends React.Component {
 }
 ```
 
-This is similar to the ["reset uncontrolled component with a prop"](https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#alternative-1-reset-uncontrolled-component-with-an-id-prop) strategy described in the React blog.
+This is similar to the *"reset uncontrolled component with a prop"* strategy described in the React blog article, [You Probably Don't Need Derived State](https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#alternative-1-reset-uncontrolled-component-with-an-id-prop).
 
+The key element to understand is that `getDerivedStateFromProps` is called when outside props *or* external state changes, and therefore we must make explicit aim to figure out whether *just the passed prop is changing.*
+
+Once we are sure of that, we are allowed to change `state.visible`.
 
 The benefit of this approach is that `render` will only ever run once, and because of that we consider it more professional. 
 
-> In non-Respond apps, additional rendering eventually has visible effects on performance. Animation heavy apps, particularly on React Native, are known for such jank. In non-animated apps (which are most common), such bad practices often go unnoticed, which is why so much of the React community lets this stuff fly.
+> In non-Respond apps, additional rendering eventually has visible effects on performance. Animation heavy apps, particularly on React Native, are known for such jank. In non-animated apps (which are most common), such bad practices often go unnoticed, which is why so much of the React community lets this stuff fly. **Not Respond!**
 
 The additional renders also make apps harder to debug. You ever wondered why your `console.logs` were being called more times than expected? And as you begin to hunt around your code as if it's a maze, you wonder why important things are being called when they shouldn't be??
 
-More than likely, you have spent too much of your life in that position. Respond curtails these areas where React is rough around the edges.
+More than likely, you have spent too much of your life playing *React Maze Runner*. Respond curtails these areas where React is rough around the edges.
 
 
 ## 4) `props.key` Strategy
@@ -233,7 +237,7 @@ Which brings us to our preferred approach, known as the ["fully uncontrolled com
 ```js
 const MyRespondModal = (props, state, actions) => (
   <Modal
-    key={!!state.modalText} // *this is key
+    key={!!state.modalText} // *this is "key"
     visible={!!state.modalText}
     text={state.modalText}
     onClose={actions.cancel}
@@ -282,7 +286,7 @@ Its downside is that if you hash on an incorrect value passed as `key`, then new
 
 Now a different modal that is also in the `visible` state will properly trigger the destruction of the previous `Modal` and the creation of a new one. 
 
-Before, changing the `modalText` would not destroy the original `Modal` instance. If you had been animating the appearing/disappearing of your modal, you wouldn't be able to trigger that. By properly timing the destruction/creation of component instances with a fitting `key`, we can achieve things like enter/leave animations:
+Before, changing the `modalText` would not destroy the original `Modal` instance. If you had been animating the entering/leaving of your modal, you wouldn't be able to trigger that. By properly timing the destruction/creation of component instances with a fitting `key`, we can seamlessly achieve things like enter/leave animations:
 
 ```js
 const SmartRespondModal = (props, state, actions) => (
@@ -301,16 +305,22 @@ const SmartRespondModal = (props, state, actions) => (
 
 ## Takeaway
 
-In the previous examples, the takeaway may be obscured by the simplicity of the implementation. 
+In the preceding examples, the takeaway may be obscured by the simplicity of the implementations. 
 
 The takeaway is that all the complexity surrounding getting the `modalText`--which may be fetched asynchronously over the network--is completely removed from the equation. 
 
-Separation of concerns enables `SmartRespondModal` to be *smart*, but by doing very little work (i.e. only the work of passing state + actions). The real work is offloaded to callbacks (sagas, graphql, etc) on your `route`, and to your reducers. In each case, the work they do is straightforward.
+Separation of concerns enables `SmartRespondModal` to be *smart*, even though it does very little work. It only does the work of passing state + actions. The real work is offloaded to callbacks (sagas, graphql, etc) on your `route`, and to your reducers. In each case, the work they do is straightforward. Again, *that's the benefit of separating your concerns.*
 
 What you save yourself from is:
  
 - entanglement coming from both fetching data and manipulating modal states at the component level
+- making your standard route transition actions concern themselves with opening/closing a modal
 - funny business regarding lifting state and context to get appropriate data back up to a top level modal
 
-Of course portals could be used for the latter issue, but there are times when they are not an option. Being able to *beam* state around--often provided via hoisted route level fetching--creates scenarios where single principle components can do their job with little knowledge of the rest of your app. This is what being *"driven"* by store state means.
+Of course portals could be used for the latter issue, but there are times when they are not an option. Being able to *beam* state around creates scenarios where single principle components can do their job with little knowledge of the rest of your app. This is what being *"driven"* by store state means. 
+
+The root cause for this simplication is that data dependencies are hoisted to top level routes that act as segues (pronounced *"segway"*) between primary renderings of your component tree. With data fetching out of the equation, your components begin to resemble a traditional template rendering layer, with little bits of logic sprinkled here and there. 
+
+Most importantly, you can stop pulling out your hair and get back to work on product. Respond brings the benefits of separation of concerns to a style of development that had gone too far in the wrong direction. The pendulum has swung back into much needed equilibrium.
+
 

@@ -386,7 +386,7 @@ An action that matches that will look like this:
 }
 ```
 
-And a path that maches will look like this:
+And a path that matches will look like this:
 
 ```js
 '/repo/faceyspacey/respond-framework/blob/master/src/core/createRouter.js'

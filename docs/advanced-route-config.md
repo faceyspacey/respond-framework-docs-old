@@ -34,6 +34,15 @@ path: '/foo/:param',
 
 because the `NEW` route is expecting a parameter by that name.
 
+You can also specify the types of namespaced child modules:
+
+```js
+OLD: {
+  path: '/foo/:param',
+  redirect: 'CHILD_MODULE/BAR'
+}
+```
+
 
 ## `route.inherit`
 
@@ -64,6 +73,14 @@ BAR: {
 },
 ```
 
+Like `route.redirect` you can specify namedspaced children types:
+
+```js
+BAR: {
+  path: '/foo/:param',
+  inherit: 'CHILD_MODULE/FOO'
+},
+```
 
 
 ## `route.callback: string`
@@ -75,7 +92,7 @@ routes: {
   FOO: {
     path: '/foo',
     thunk: () => ...,
-    onEnter: () => ...,
+    onEnter: () => ..., // won't be inherited
   },
   BAR: {
     path: '/bar',
@@ -148,6 +165,7 @@ routes: {
 }
 ```
 
+> Yes, you can inherit another array of callbacks as well.
 
 ## `route.middleware`
 
@@ -159,11 +177,11 @@ import { commit, changePageTitle } from 'respond-framework/middleware'
 
 routes: {
   FOO: {
-    path: '/foo/:param',
+    path: '/foo',
     middleware: [
       api => async (req, next) => {
         const { api, actions } = req
-        const payload = await req.api.fetch('something')
+        const payload = await api.fetch('something')
         actions.foo.complete(payload)
 
         await next()
@@ -176,14 +194,14 @@ routes: {
 }
 ```
 
-You have to call and await `next` for the following middleware (in this case `commit` and `changePageTitle` to be called). This allows for re-use of existing middleware. 
+You have to call and await `next` for the following middleware to be called (in this case `commit` and `changePageTitle`). This allows for re-use of existing middleware. 
 
 If you don't plan to do anything after the subsequent middleware are called you can simply return the call to `next` since it returns a promise that the middleware pipeline can resolve on its own:
 
 ```js
 api => async (req, next) => {
   const { api, actions } = req
-  const payload = await req.api.fetch('something')
+  const payload = await api.fetch('something')
   actions.foo.complete(payload)
 
   return next()
@@ -212,9 +230,11 @@ api => {
 }
 ```
 
+> In addition to middleware customization, `route.middleware` can be a good way to reduce the number of things that go on during route transitions. This provides you additional control over *(and certainty of)* everything going on. It's basically an advanced *all-in-one* callback.
+
 ## `route.initialEntries: Array<Entry>`
 
-> `initialEntries` at the route level is only kicked into action if the given route is the first route the app is loaded on, ***and there is no existing stack of history entries loaded either from the options level or from the browser's `sessionStorage`.*** In other words, it's used for direct visits to your app or site.
+> `initialEntries` at the route level is only kicked into action if the given route is the first route the app is loaded on, ***and there isn't more than one entry loaded either from the options level or from the browser's `sessionStorage`.*** In other words, it's used for direct visits to your app or site.
 
 
 The token example where this capability is needed at the route level is if a user directly visits, say, step 3 of your checkout. `route.initialEntries` allow you to fill in steps 1-3, so if the user taps *back* the correct entries will be there. 
@@ -231,12 +251,12 @@ See [options.initialEntries](./options.md#initialentries-arrayentry) for more in
 
 ## `route.initialIndex: number`
 
-See [options.initialIndex](./options.md#initialindex-number) for more information.
+See [options.initialIndex](./options.md#initialindex-number) for more information. The options level one overrides the route level.
 
 
 ## `route.initialN: number`
 
-See [options.initialN](./options.md#initialn-number) for more information.
+See [options.initialN](./options.md#initialn-number) for more information. The options level one overrides the route level.
 
 
 ## `route.parseSearch`

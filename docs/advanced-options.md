@@ -11,39 +11,6 @@ Forking tools greatly reduces developer productivity. Now you likely don't need 
 The following customizations are to be *enjoyed* when you're in pain and you need to do something your unique app requires:
 
 
-## `createReducer(initialState, routes): reducer`
-
-`createReducer` will be called with the inital state and your routes object. Return a reducer of shape `(state, action, types) => nextState` in order to customize how your location state is handled. A common pattern is to use the built-in one and make minor changes, eg:
-
-```js
-import { createReducer } from 'respond-framework/core'
-
-const options = {
-  createReducer: (initialState, routes) => {
-    const reducer = createReducer(initialState, routes)
-
-    return (state, action, types) => {
-      if (action.someFlag) {
-        return {
-          ...state,
-          ready: action.someFlag
-        }
-      }
-
-      return reducer(state, action, types)
-    }
-  }
-}
-
-createModule(routes, options)
-```
-
-
-## `createInitialState(action): state`
-
-This function will receive the same action returned from `firstRoute` and generate the initial state from it. That initial state is the same state passed to `createReducer` above. The same pattern as with `createReducer` can be used here. Rarely will you need to fully customize this method.
-
-
 
 
 ## `createRequest(action, api, next): request`
@@ -79,6 +46,8 @@ Note that `performSpecialFeature` is pre-bound to `this` even though you destruc
 
 
 ## `createHistory(routes options): History`
+
+> There can only be one `History`. Therefore only `createApp` can specify this option; not `createModule`.
 
 Perhaps the only use case for this is fixing bugs in our internal `History` class, and you want to try your fixes out without forking. The internal one simply detects if the `BrowserHistory` class should be used or the `MemoryHistory` class:
 
@@ -167,6 +136,43 @@ route.cache = true
 ```
 
 
+## `createReducer(initialState, routes): reducer`
+
+> Unlike other options, child modules use the parent module's `createReducer`, falling back to the built-in one if none are specified by ancestors. They can override it however, in which case multiple location reducers are used. It's not suggested to do that unless there's a real need. Instead, if possible. make the top level `createReducer` passed to `createApp` cover the cases of all your modules.
+
+`createReducer` will be called with the inital state and your routes object. Return a reducer of shape `(state, action, types) => nextState` in order to customize how your location state is handled. A common pattern is to use the built-in one and make minor changes, eg:
+
+```js
+import { createReducer } from 'respond-framework/core'
+
+const options = {
+  createReducer: (initialState, routes) => {
+    const reducer = createReducer(initialState, routes)
+
+    return (state, action, types) => {
+      if (action.someFlag) {
+        return {
+          ...state,
+          ready: action.someFlag
+        }
+      }
+
+      return reducer(state, action, types)
+    }
+  }
+}
+
+createModule(routes, options)
+```
+
+
+## `createInitialState(action): state`
+
+> The same considerations as `createReducer` apply. See above.
+
+This function will receive the same action returned from `firstRoute` and generate the initial state from it. That initial state is the same state passed to `createReducer` above. The same pattern as with `createReducer` can be used here. Rarely will you need to fully customize this method.
+
+
 
 ## `shouldTransition(action, api): boolean`
 
@@ -206,6 +212,39 @@ If you want to completely customize `compose`, dig up the source and get to work
 
 > Feel free to explore new ways Respond can be molded. Respond is all about scaling large codebases of serious custom apps.
 
+
+If you have need to remove the built-in middleware, you can in fact use `compose` to remove them. The built-in middleware are prepended even if you provide your own custom middleware array. Here's what they are:
+
+```js
+middlewares: [
+  serverRedirect,      
+  anonymousThunk,
+  pathlessRoute('thunk'),
+  transformAction,
+  // ...easily customizeable middleare
+```
+
+You can use `compose` to forgo them like so:
+
+```js
+import { compose } from 'respond-framework/core'
+
+export default (ignoredMiddlewares, api, killOnRedirect) => {
+  return compose([
+    pathlessRoute('thunk'),
+    transformAction,
+    call('beforeEnter'),
+    commit,
+    call('onEnter' { cache: true })
+  ], api, killOnRedirect)
+}
+```
+
+> Notice `ignoredMiddlewares` is not used, and the middleware you want to use are specified *in place*.
+
+You might do something like that because your obsessive compulsive about performance, and you don't want to lose even microseconds on things you are not using.
+
+**This is an escape hatch for advanced use cases. Be careful particularly with `transformAction`, as it's needed for both subsequent middleware and the location reducer. `pathlessRoute` is needed for various built-in features *(changeBasename, history action creators, caching, and leave confirmation)*. If you choose to remove it, you do so at your own risk.**
 
 
 ## `formatRoute(inputRoute, type, routes): route`

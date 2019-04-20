@@ -188,6 +188,9 @@ They will both match.
 
 ## Transformations 
 
+> The following ransformations like `toPath`, `fromSearch`, `defaultHash`, etc can be provided at both the route level and the options level. If provided at the options level, they will be applied to all routes in the given module. Route level is more common, so all examples below will be attached to routes.
+
+
 ### `to/fromPath(value, key): string`
 
 To customize the param transformation into how you want your app to see it, here's how the date from above could be handled:

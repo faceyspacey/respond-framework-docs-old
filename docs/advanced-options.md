@@ -75,8 +75,7 @@ Here's the default `createCacheKey` for you to think about:
 
 ```js
 const defaultCreateCacheKey = (action, name) => {
-  const { type, basename, location } = action
-  const { pathname, search } = location
+  const { type, basename, pathname, search } = action
   return `${name}|${type}|${basename}|${pathname}|${search}` 
 }
 ```
@@ -85,8 +84,7 @@ You'll notice we don't cache using the URL hash, as in most apps, it has the sam
 
 ```js
 options.createCacheKey = (action, name) => {
-  const { namespace, type, hash, basename, location } = action
-  const { pathname, search } = location
+  const { namespace, type, hash, basename, pathname, search } = action
   return `${name}|${namespace}|${type}|${basename}|${pathname}|${search}|hash` 
 }
 ```
@@ -221,7 +219,7 @@ middlewares: [
   anonymousThunk,
   pathlessRoute('thunk'),
   transformAction,
-  // ...easily customizeable middleare
+  // ...easily customizable middleare
 ```
 
 You can use `compose` to forgo them like so:

@@ -3,7 +3,18 @@
 
 ## Route
 
-Respond's `<Route />` component will appear both familiar and new at the same time. It can do the path basic path matching functionality *React Router* does:
+
+Respond's `<Route />` component will appear both familiar and new at the same time:
+
+- it can do the traditional path matching you're likely familiar with from *React Router* and *Reach Router*
+- it can do state-based matching, which de-couples what's displayed from the path in the address bar
+- *and* it can do some very slick things revolving around the dependency injection of code split components
+
+Let's take a look:
+
+### Traditional Path Matching
+
+Basic path matching like in *React Router* looks like this:
 
 ```js
 import { Route } from 'respond-framework/components'
@@ -11,9 +22,9 @@ import { Route } from 'respond-framework/components'
 <Route path='/settings' component={Settings} />
 ```
 
-*Except you never need to specify a `<Router />` ancestor.* You can drop a `<Route />` component wherever you want.
+> *Except you never need to specify a `<Router />` ancestor.* You can drop a `<Route />` wherever you want.
 
-It can also do the ***composable relative path*** thing *Reach Router* does:
+It can also do ***composable relative paths*** like *Reach Router*:
 
 ```js
 const Settings = (props) => (
@@ -24,8 +35,18 @@ const Settings = (props) => (
 Notice the the absence of a leading slash before `'notifications'`. The `Notifications` component will show when the following path is in the address bar:
 - `/settings/notifications`
 
-But none of that is as powerful and correct as a strategy that doesn't break when you change your paths:
+And the first route will also show on this path...unless we specify the `exact` prop:
 
+```js
+<Route path='/settings' component={Settings} exact />
+```
+
+Now, it will only show on *exactly* `'/settings'`.
+
+
+### Introducing the `type` prop
+
+Using paths has a major weakness though: they break in multiple/all places when you want to change them. To remedy that, we recommend using a `type` instead:
 
 ```js
 const App = (props, state, actions, types) => (
@@ -52,7 +73,7 @@ routes: {
 
 ### Pro Tip: Match State Instead
 
-But even the `type` prop is for temporary prototyping. When your app's needs expand, you use state from reducers:
+But even the `type` prop is only recommended for temporary prototyping. When your app's needs expand, you use state from reducers:
 
 
 ```js
@@ -290,6 +311,69 @@ const Switcher = (props, { location, page }) => {
 }
 ```
 
+Yes, we realize it **couldn't be any easier and natural.**
+
+
+### Gotchas
+
+- Without `shouldUpdate` enabled, you can do this:
+
+```js
+const App = (props) => (
+  <Route path='/settings' component={props => <Settings {...props} foo={123} />} />
+)
+```
+
+> and not worry about the passed in component re-rendering like you would in React Router, for the reasons described above.
+
+- If you wanted to allow rendering in order to capture a variable from a closure, you would:
+
+```js
+const App = ({ foo }) => (
+  <Route
+    path='/settings'
+    component={useCallback(props => <Settings {...props} foo={foo} />, [foo])}
+  />
+)
+```
+
+- `params` matched in the path prop don't do anything:
+
+```js
+<Route path='/settings/:parameter' component={Settings} />
+```
+
+Firstly, keep in mind you'll be matching existing routes in your routes map, which have their own named parameter segments. So presumably you used the same names. 
+
+But if you didn't, what you used in your routes map will be what's available in state. For example, this route:
+
+```js
+routes: {
+  SETTINGS: '/settings/param'  
+}
+```
+
+will result in **`state.location.params.param`** being available in all your components (and callbacks, etc).
+
+
+Along with this gotcha is the realization that unlike in React Router et al, you are **no longer reaching for props that have matched params**, eg:
+
+```js
+<Route
+  path='/settings/:parameter'
+  render={props => <Foo param={props.match.params.parameter} />}
+/>
+```
+
+Instead, you have access to them everywhere seamessly and frictionlessly:
+
+```js
+const App = (props, { location: { params, query, basename, etc } }) => (
+  <Foo param={param} query={query} basename={basename} etc={etc}
+)
+```
+
+> And not to mention the plethora of rich routing information Respond provides that you won't find in any other solution.
 
 
 ## Link

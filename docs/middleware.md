@@ -378,6 +378,7 @@ const config = {
   prev: boolean = false,
   start: boolean = false,
   fallbackMode: boolean = false,
+  shouldCall: request => [boolean, boolean],
   skip: 'options' | 'route' | 'none' = 'none',
   cache: boolean | Function = false,
   shortcuts: boolean = true
@@ -520,6 +521,17 @@ Accordingly, manual dispatches are designated as an escape hatch from the standa
 Enable to skip options level callbacks when the route level callback is available. In other words, call one, not both, prioritizing the callback attached to the route.
 
 
+### `config.shouldCall`
+
+Optionally you can provide a function which manually determines if  callbacks should be called. It's passed the `request` object, and returns a tuple containing 2 values. 
+
+For example the following allows routes to prevent themselves from being called:
+
+```js
+config.shouldCall = request => request.route.skip
+  ? [true, false]
+  : [true, true ]
+```
 
 ### `config.skip` *(default: 'none')*
 

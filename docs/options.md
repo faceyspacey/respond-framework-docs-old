@@ -90,56 +90,24 @@ export default (request, response) => createModule(config, {
 This is the pattern for providing a fully populated `api` instance on both the client and server as part of SSR. See [dependency injection](./dependency-injection.md) for a complete example of how you might provide a feature-complete `api` instance.
 
 
+## `enhancer`
 
-## `shouldCall(callbackName, route, request): boolean`
-
-This is a very common function to override. It's used to make the determination of what callbacks to call. Here's the default implementation:
-
-```js
-const options = {
-  shouldCall: (name, route, req) => {
-    if (!route[name] && !req.options[name]) return false
-
-    // skip callbacks (beforeEnter, thunk, etc) called on server, which produced initialState
-    if (isHydrate(req) && !/onEnter|onError/.test(name)) return false
-
-    // dont allow these client-centric callbacks on the server
-    if (isServer() && /onEnter|Leave/.test(name)) return false
-
-    return allowBoth
-  }
-}
-
-const allowBoth = { route: true, options: true }
-```
-
-Return `false` to allow none, or an object as above to specify which of the 2 to call. 
-
-A common pattern is to turn off parallel calling of both route callbacks + options callbacks, and use the options callback as a "fallback." In other words to give precedence to a `route` callback. Here's how you might implement that:
-
-```diff
-options.shouldCall = (name, route, req) => {
-  if (!route[name] && !req.options[name]) return false
-
-  // skip callbacks (beforeEnter, thunk, etc) called on server, which produced initialState
-  if (isHydrate(req) && !/onEnter|onError/.test(name)) return false
-
-  // dont allow these client-centric callbacks on the server
-  if (isServer() && /onEnter|Leave/.test(name)) return false
-
-+  if (route[name]) return allowOnlyRoute
-  return allowBoth
-}
-
-const allowBoth = { route: true, options: true }
-+const allowOnlyRoute = { route: true, options: false }
-```
-
-And here's how to let the route have a simple boolean flag to skip options callbacks:
+Redux users will feel right at home. Respond can accept both Redux enhancers and Redux middleware:
 
 ```js
-return { options: !route.skipOpts, route: true }
+import { applyMiddleware, compose } from 'redux'
+import customSynchronousMiddleware from './middlware'
+import customEnhancer from './enhancer'
+
+options.enhancer = compose(
+  applyMiddleware(customSynchronousMiddleware),
+  customEnhancer
+)
 ```
+
+Respond brings along the entire Redux ecosystem with it. Keep in mind you likely won't be using asynchronous middleware like Sagas or Observables, as Respond specializes in handling async work. However things like `redux-persist` fit right in and make a lot of sense.
+
+
 
 
 

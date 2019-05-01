@@ -529,13 +529,27 @@ The thing to keep in mind with all this is that a lot of these issues come from 
 
 Another such thing is route blocking. Sometimes you want to block a user from leaving a page such as an incomplete checkout (`beforeLeave`). Sometimes you want to block a user from entering a page such as a page that requires special authentication (`beforeEnter`). And both are places you may want to do async work. 
 
-> And believe us, *these are things you want to do*. We know--these are THE MOST requested features from [redux-first-router](https://github.com/faceyspacey/redux-first-router) which became the basis of what you're reviewing today.
+> And believe us, *these are things you want to do*. We know--these are THE MOST requested features from [redux-first-router](https://github.com/faceyspacey/redux-first-router) which became the basis of what you're reviewing today. 
+
+> It's basically a world first to have these pristine sequential asynchronous pipelines to work with, given the control the browser's pop handling exerts. *It's a world first that Respond has finally overcome it.*
 
 So the fact that route transitions are not necessarily instantaneous means users can try to do things in the middle of ongoing transitions. 
 
-The browser back/next buttons are especially complex. UI-triggered actions are a lot easier to handle since we don't need to normalize and undo URL changes we had no upfront control over.
+The browser back/next buttons are especially complex. 
 
-In general, Respond has to jump through a lot of hoops to track when routes are short-circuited via redirects or returning `false` to stop a transition dead in its tracks. Then there's also users tapping the same button/link over and over again. It should be known that Respond blocks all "double dispatches." Don't expect to see the devtools stacked up with the same redundant actions over and over again, and the same thunks fetchign the same data over and over again.
+UI-triggered actions, on the other hand, are a lot easier to handle since we don't need to normalize and undo URL changes we had no upfront control over.
+
+In general, Respond has to jump through a lot of hoops to track when routes are short-circuited via redirects or returning `false` to stop a transition dead in its tracks. Then there's also users tapping the same button/link over and over again. It should be known that Respond blocks all "double dispatches." Don't expect to see the devtools stacked up with the same redundant actions over and over again, and the same thunks fetching the same data over and over again. But do expect newly triggered routes to cancel ongoing transitions that have yet to commit--the later one takes precedence.
+
+We're still just scratching the surface. Respond has solutions for myriad other scenarios:
+
+- multiple redirects within transitions (aka nested pipelines)
+- nested pathless routes + anonymous thunks dispatching redirects
+- 
+
+The list goes on. The point is Respond makes important most solutions want to leave up to you in userland. By considering all these things, and having a few opinions about them, and through having an overall purpose as a driving light, Respond is able to connect the dots across disparate behaviors and capabilities to create a cohesive whole. 
+
+For the most part, you don't have to think about this stuff. But for curious/advanced developers of integrity, this doc should increase your comfort levels--**yes, Respond lets you build apps as if the address bar, the sorely lacking `history` API, and browser are no longer in your way. Transparently as if they're non-existent.**
 
 
 

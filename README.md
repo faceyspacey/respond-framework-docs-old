@@ -1352,96 +1352,9 @@ If you're app doesnt have SSR, you can use [redux-persist](https://github.com/rt
 > for an example of an Api class check our DI doc: [Dependency Injection + Api class example](./dependency-injection.md)
 
 
+## TODO
 
-## Route Options
-
-
-The following are options that you can attach to each route, such as at `route.toPath => () => ...`
-
-Unless indicated by an *astersik* (\*) you can also expect them to work within the `options` argument passed to `createModule`. The difference is that *module level options* work for all routes in the module.
-
-### URL Transformations
-| name | arguments | return |
-| --- | --- | --- |
-| toPath | arg1, arg2| return foo|
-| fromPath | arg1, arg2| return foo|
-| toSearch | arg1, arg2| return foo|
-| fromSearch | arg1, arg2| return foo|
-| toHash | arg1, arg2| return foo|
-| fromHash | arg1, arg2| return foo|
-| toState* | arg1, arg2| return foo|
-| fromState* | arg1, arg2| return foo|
-
-> Browser's allow a `state` object to be attached to each entry in the browser's `history` stack, that way when you revisit a URL, you have access to anything you want remembered. *Respond* makes it trivial to store reactive objects here, similar to state attached to components.
-
-### Automatic Transformations
-| name | type | default |
-| --- | --- | --- |
-| capitalizedWords | boolean | `false` |
-| convertNumbers | boolean | `false` |
-
-
-### Default Values
-| name | arguments | return |
-| --- | --- | --- |
-| defaultParams | arg1, arg2| return foo!|
-| defaultQuery | arg1, arg2| return foo|
-| defaultHash | arg1, arg2| return foo|
-| defaultState | arg1, arg2| return foo|
-
-
-
-### MISC
-| name | arguments | return |
-| --- | --- | --- |
-| parseSearch | arg1, arg2| return foo|
-| stringifyQuery | arg1, arg2| return foo|
-
-
-### Matchers
-| name | arguments | return |
-| --- | --- | --- |
-| path | arg1, arg2| return foo|
-| query | arg1, arg2| return foo|
-| hash | arg1, arg2| return foo|
-| fromQuery | arg1, arg2| return foo|
-| toHash | arg1, arg2| return foo|
-| fromHash | arg1, arg2| return foo|
-| toState* | arg1, arg2| return foo|
-| fromState* | arg1, arg2| return foo|
-
-- transformation
-- tons of info in state
-- automatic basename handling
-
-
-
-This is the mental model of components in *Respond*. But is each component truly *pure*? No, but you don't have to concern yourself with that. It is pure from your perspective when all you truly care about is purity of `f` aka `render`.
-
-
-
-## Routing Components
-- <Route />
-- <Link />
-
-
-## Misc Features
-- History Entries Sync (world first!)
-
-
-## Middlewares
-- Caching
-- pathless routes
-- anonymous thunks
-
-
-
-
-## Big Picture
-
-Modularity + Linear Side Effects (copy monologue from beginning of pitch doc)
-
-
+move the above sections into individual files in the /docs folder, and leave a minimal description + Table of Contents.
 
 
 ## Conclusion

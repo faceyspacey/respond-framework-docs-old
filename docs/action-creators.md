@@ -28,7 +28,7 @@ import {
 
 ```
 
-##Main Action Creators
+## Main Action Creators
 
 | name | arguments | 
 | --- | --- | 
@@ -178,22 +178,9 @@ import {
 
   See [options.createCacheKey](./advanced-customization-options.md#create-cache-key) for more info on how to customize the cache key created, and accordingly what sort of strings you must provide to match items you want to invalidate. 
 
-## Back/Next Action Creators
-
-These action creators serve a specific purpose: when you don't want to think about what possible route the user came from to reach the current route, but you want to reliably send them backward or perhaps forward without having to think of what action to form.
-
-You can optionally pass a second argument for `state` you want attached to the history entry.
-
-| name | arguments | 
-| --- | --- | 
-| `back` | `state?: Object` | 
-| `next` | `state?: Object` | 
-
-> They only work so reliably because Respond has a perfect history entries stack mirrored to the browser's hidden one.
 
 
-
-##History Action Creators
+## History Action Creators
 
 The `push` and `replace` action creators should be used *only* when you have a URL to work with and want to translate it into an action, such as when receiving deep links or push notifications on React Native. 
 
@@ -208,6 +195,29 @@ There may be times where it makes sense in the browser, but you better have a go
 The reason the correct way to change routes is with actions is because that allows you to easily change the URLs your users see without changing much application code.
 
 
+
+## Back/Next Action Creators
+
+These action creators serve a specific purpose: when you don't want to think about what possible route the user came from to reach the current route, but you want to reliably send them backward or perhaps forward without having to think of what action to form.
+
+You can optionally pass a second argument for `state` you want attached to the history entry.
+
+| name | arguments | 
+| --- | --- | 
+| `back` | `state?: Object` | 
+| `next` | `state?: Object` | 
+
+They work reliably because Respond perfectly mirrors the history entries stored in state to the browser's hidden one. This solves many problems, one of which being the potential of bouncing a visitor from your site. `back` and `next` (as well as `jump` below) safe-guarded from that by throwing an exception. Which is an indicator you should use Respond's `canJump` selector:
+
+```js
+const MyComponent = (props, { location }, { back, step1 }) => (
+  <button onClick={location.canJump(-1) ? back() : step1()}>
+    back
+  </button>
+)
+```
+
+> Respond is the new frontier when it comes to accurate `history` API usage. Check the [History Mirroring](./history-mirroring.md) doc for a deep dive on this subject.
 
 
 ## Advanced History Action Creators

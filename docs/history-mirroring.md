@@ -1,15 +1,15 @@
 # History Mirroring
 
-Respond is the **first general purpose routing solution to successfully sync the browser's** ***hidden*** **history stack to one your app can see**. Until now, apps didn't bother tracking this stack because they knew they couldn't accurately sync it. 
+Respond is the **first general purpose routing solution to successfully sync the browser's** ***hidden*** **history stack to one your app can see**. Until now, apps didn't bother tracking this stack because they thought they couldn't accurately sync it. 
 
-As a result *"web apps"* have been closer to *"web pages"* than they could be. Websites certainly have not been fertile ground for experiences that make use of the user's history, such as wizards and stack navigators. It's why you see horizontally animated navigators almost exclusively on native, and none on web. 
+As a result, apps could not know where visitors *have been*, only where they *are*. *"Web apps"* have been closer to *"web pages"*. Experiences such as wizards and stack navigators have not been fully functional. It's why you see horizontally animated navigators almost primarily on native, and few on web. Those days are now over.
 
-*Until now*, apps could not know where the visitors have been, only where they *are*. And our apps have been far less than what they could be as a result. Respond opens a whole new world of possibilities.
+Let's take a deep dive into the long-standing problem Respond has solved.
 
 
 ## The Problem
 
-For those who haven't followed this problem space, basically the browser doesn't let you know what URLs you visited (even on a website you manage), when clearly it *itself* knows. For example, if you visited:
+For those who haven't followed this problem space, basically the browser doesn't let you know what URLs you visited (even on a website you manage), when clearly it *itself* knows. For example, if you visited the following pages:
 
 ```js
 [
@@ -39,20 +39,22 @@ However, it would be nice if after you visited hacker news, and pressed the back
 Imagine the things you could do if you always knew exactly where a user was along the track of history entries:
 
 ```js
-entries: [
-  ['https://www.respondframework.com', {}],
-  '[https://www.respondframework.com/docs', {}],
-  ['https://www.respondframework.com/tutorial', { stateFoo: 'bar' }],
-],
-index: 2,
-length: 3
+history = {
+  entries: [
+    ['https://www.respondframework.com', {}],
+    ['[https://www.respondframework.com/docs', {}],
+    ['https://www.respondframework.com/tutorial', { stateFoo: 'bar' }],
+  ],
+  index: 2,
+  length: 3
+}
 ```
 
 Unfortunately, all the browser gives is information about the current URL and the `length` for the number of entries in that hidden array:
 
 ```js
 window.history = {
-  length: 3,
+  length: 3, // This isn't the length of only entries on your site, but for the whole tab! It's useless!
   state: { stateFoo: 'bar' }
 }
 
@@ -69,10 +71,10 @@ And in regards to the ability to manipulate things, the browser gives you barely
 history.pushState({ stateFoo: 'bar' }, '', '/next-path')
 ```
 
-The `history` object has a few other methods, but they all pretty much amount to the same as pushing another URL. You certainly can't rewrite the whole history stack. More on that shortly...
+The `history` object has a few other methods, but they all pretty much amount to the same as pushing another URL. You certainly can't rewrite the whole history stack. More on that shortly.
 
 
-> HONORABLE MENTION: in the past, solutions for stack navigators have tried to maintain history state in the URL itself, for example: `/tutorial/step-1/step-2/step-3`, but this failed for many reasons: *browser back/next buttons are impossible to sync (users can pop right off your own site), SEO is sacrificed since multiple URLs exist for the same page, URLs are messy and hard to remember, state for each entry is non-existent, etc.* **You don't see it around the web because it doesn't cut the mustard.**
+> HONORABLE MENTION: in the past, solutions for stack navigators have tried to maintain history state in the URL itself, for example: `/tutorial/step-1/step-2/step-3`, but this failed for many reasons: *browser back/next buttons are impossible to sync (users can pop right off your own site), SEO is sacrificed since multiple URLs exist for the same page, URLs are messy and hard to remember, state for each entry is non-existent, etc.*
 
 
 
@@ -146,13 +148,15 @@ In summary, you can push and replace entries, and you can move along the history
 
 Unfortunately, without knowing what index you're on, `go`, `back`, and `forward` should not be used. Here's why: if you run `history.back()` there's a possibility you send the user back to an external website you do not control.
 
+> As commented above, `history.length` includes entries from other sites in the current tab, and therefore can't be used to detect if you will `back` off the site.
+
 So in actuality all we have is *push* and *replace*. 
 
 What any wizard or stack navigator needs though is 3 capabilities:
 
-1. **the ability to reset the entire stack**
-2. **to move the user to any index of the stack**
-3. **to change any entry on the stack**
+1. **the ability to `reset` the entire stack**
+2. **to `jump` the user to any index of the stack**
+3. **to change (aka `set`) any entry on the stack**
 
 
 ### 1. Reset
@@ -162,14 +166,14 @@ Imagine you could dispatch a command/action that completely rewrites the entry s
 ```js
 const index = 2
 const direction = -1
-const stack = [
-  'https://www.respondframework.com/tutorial/step-1',
-  'https://www.respondframework.com/tutorial/step-2',
-  'https://www.respondframework.com/tutorial/step-3',
-  'https://www.respondframework.com/tutorial/step-4',
+const entries = [
+  '/tutorial/step-1',
+  '/tutorial/step-2',
+  '/tutorial/step-3',
+  '/tutorial/step-4',
 ]
 
-actions.reset(stack, index, direction)
+actions.reset(entries, index, direction)
 ```
 
 That will obviously result in this stack:
@@ -189,7 +193,7 @@ prev: 'https://www.respondframework.com/tutorial/step-4'
 
 Keep in mind to achieve this, we must go beyond just changing how your app perceives the stack. **We must also change the URLs that the address bar just saw!**
 
-Respond makes precisely this possible. To pull this off, Respond changes the URLs as fast as it can, creating an almost imperceptible change in the address bar.
+Respond makes precisely this possible. To pull this off, Respond changes the URLs as fast as it can, creating an almost imperceptible change in the address bar. *Yea, we went there!*
 
 Let's look at a real life use case--resetting a checkout stack navigator after a purchase is complete:
 
@@ -202,10 +206,23 @@ routes: {
     const { success, reason } = api.post('checkout', payload)
 
     return success
-      ? actions.reset(stack)
+      ? actions.reset(entries)
       : actions.flashMessage('Checkout submission failed because ' + reason)
   }
 }
+```
+
+#### Additional `stack` Formats
+
+`reset` also accepts entries in several forms:
+
+```js
+const entries =  [
+  '/tutorial/step-1',                               // path string as above                    
+  ['/tutorial/step-1', { some: 'state' } ],         // with a state object
+  ['/tutorial/step-1', { some: 'state' }, '12345'], // with a user-provided unique identifier iey
+  { type: 'TUTORIAL', params: { page: 'step-1' } }  // as an action object
+]
 ```
 
 ### 2. Jump
@@ -218,6 +235,7 @@ actions.jump('12345')                                                 // jump to
 actions.jump(-2, { params: { foo: 'bar' }, state: { baz: 'boss' } })  // jump and change the URL + state
 actions.jump(0, {}, true)                                             // jump by index
 actions.jump(0, {}, true, 1)                                          // fake the direction in state
+actions.jump('12345', {}, true)                                       // jump to entry with matching key
 ```
 
 And for good measure Respond offers 2 shortcuts:
@@ -233,11 +251,11 @@ Why the rename? Because if you're moving one entry, the smart thing to do is use
 
 In addition, our `jump` really is a big *jump* since you can also change its state, all the URL parts and even the action type. The 2nd argument accepts all the usual suspects: `params`, `query`, `hash`, `basename`, `state`. Leaving out the `type` is customary, but you could also provide it to jump to a route that was not there before.
 
-All 3 actions will never bounce a visitor from your site. They're safe-guarded from that by throwing an exception. Which is an indicator you should use Respond's `canJump` selector:
+All 3 actions will never bounce a visitor from your site. They're safe-guarded from that by throwing an exception. Which is an indicator you should use Respond's built-in `canJump` selector:
 
 ```js
-const MyComponent = (props, { location }, { back, step1 }) => (
-  <button onClick={location.canJump(-1) ? back() : step1()}>
+const BackButton = (props, { canJump }, { back, step1 }) => (
+  <button onClick={canJump(-1) ? back() : step1()}>
     back
   </button>
 )
@@ -258,9 +276,9 @@ This behavior **enhances user experience and rendering performance**:
 - users know when they are going back and forth between the same 2 pages in a stack navigator, and they would prefer the stack navigator did too, instead of push a million entries. This keeps the stack small and easy to navigate.
 - stack navigators, wizards and carousels often hide the previous page, but still have it rendered. This allows for the speediest return to the given page, and, again, a reduction in memory
 
-In summary, Respond detects when you're going to a previously visited page, but only when it's directly adjacent to the current entry. Because what else could you be doing? They share the exact same URL. They are the exact same page. You were just there! Your intent is to return to where you just were. `jump` is automatically used in these circumstances.
+In summary, Respond detects when you're going to a previously visited page, but only when it's directly adjacent to the current entry. Because what else could you be doing? They share the exact same URL. They are the exact same page. You were just there! Your intent is to return to where you just were. `jump` is automatically used in these circumstances. This a powerful, automatic, yet opinionated and logical feature unique to Respond.
 
-> And yes, you guessed it, Respond strongly positions itself toward solving the suffering of developers seeking correct declarative stack navigators. More on that below.
+> And yes, you guessed it, Respond aims to solve the suffering of developers seeking correct declarative stack navigators. More on that below.
 
 
 
@@ -277,8 +295,8 @@ It allows you to set changes that skip the async route pipeline and efficiently 
 Here's how you set entries other than the current one:
 
 ```js
-actions.set({ state: { flag: 'something' } }, -2)
-actions.set({ state: { flag: 'something' } }, '12345')  // by entry key
+actions.set({ state: { flag: 'something' } }, -2)       // by delta
+actions.set({ state: { flag: 'something' } }, '12345')  // by unique entry key
 actions.set({ state: { flag: 'something' } }, 0, true)  // by index
 ```
 
@@ -320,19 +338,19 @@ Very few attempts have been made in the past to sync an *in-memory* data structu
 
 > Submit one as an issue, and we'll amend these lines. Until then you can assume the accuracy of these statements.
 
-Respond follows this path to the bitter end. Because we control every aspect of routing, we are able to do things smaller libraries can't do. We're able to know where users went, from *start to finish.* 
+Respond follows this path to the bitter end. Because we control every aspect of routing, we are able to do things smaller libraries can't do. We're able to know where users went, from *start to finish,* as well as where they are in on ongoing transition. 
 
-The challenge here is that during *non-instant* async transitions, it's very easy to lose track of how the browser sees the stack. Redirects and blocked route transitions throw a major wrench in the system. Rapid usage of the browser's back/next buttons and pipeline cancellations make matters worse. The biggest culprit however is that chrome doesn't perform *all* transitions synchronously.
+The challenge here is that during *non-instant* async transitions, it's very easy to lose track of how the browser sees the stack. Redirects and blocked route transitions throw a major wrench in the system. Rapid usage of the browser's back/next buttons and pipeline cancellations make matters worse. The biggest culprit however is that chrome doesn't perform *all* transitions synchronously!
 
-Then there's also the challenge that sometimes `sessionStorage` isn't availbale, such as when browsers are in "incognito mode." Of course we have a solution for that as well: fallback to storing all info on each and every history state entry. 
+Then there's also the challenge that sometimes `sessionStorage` isn't availbale, such as when browsers are in "incognito mode." Of course we have a solution for that as well: fallback to storing all info on each and every history state entry. More on that shortly.
 
-And when browser's don't support history at all, we fallback to an in-memory solution that keeps the same URL the entire time. We have chosen to do this instead of a hash based solution like we previously had with [redux-first-router](https://github.com/faceyspacey/redux-first-router).
+And when browser's don't support history at all, we fallback to an in-memory solution that keeps the same URL the entire time. Browsers have advanced far enough that we have chosen to do this instead of a hash based solution like we previously had with [redux-first-router](https://github.com/faceyspacey/redux-first-router).
 
-To give you confidence that Respond has you covered, let's examine the solutionst to the challenges one by one:
+To give you confidence that Respond has you covered, let's examine the solutions to the challenges one by one:
 
 ## Session Storage
 
-`sessionStorage` is what allows Respond to remember the history stack when visitors click links to other sites and return. Unlike `localStorage`, `sessionStorage` isn't remembered on subsequent visits once the given browser tab is closed. This is a perfect impedence match for our goal of remembering just the current tab's stack of visited URLs.
+`sessionStorage` is what allows Respond to remember the history stack when visitors click links to other sites and return. Unlike `localStorage`, `sessionStorage` isn't remembered on subsequent visits once the given browser tab is closed. It's short-term storage just for a given tab while it's open. It's a perfect match for our goal of remembering just the current tab's stack of visited URLs.
 
 This is a foundation we can build upon. From here, we need to make sure to never get out of sync. If we always stay in sync, we can just write to session storage the above info, which by the way looks closer to this:
 
@@ -340,8 +358,8 @@ This is a foundation we can build upon. From here, we need to make sure to never
 {
   index: 1,
   entries: [
-    ['https://www.respondframework.com', { stateFoo: 'bar' }, '12345'], // '12345' is a unique key, used
-    ['https://www.respondframework.com/tutorial/step-1', {}, '567378']  // by `set` and `jump`
+    ['https://www.respondframework.com', { stateFoo: 'bar' }, '12345'],
+    ['https://www.respondframework.com/tutorial/step-1', {}, '567378']
   ]
 }
 ```
@@ -418,11 +436,9 @@ window.history.state = {
 }
 ```
 
-**Hey, we're missing an entry!** Yes, but it doesn't matter because, when returning from an external site, we had just the state we needed at the *tail* of the stack. 
+**Hey, we're missing an entry!** Yes, but it doesn't matter because, when returning from an external site, we had just the state we needed at the *tail* of the stack, and now the Respond app is running based on this location state. Respond won't continue to look into `window.history.state` on each history change. It only does so on the initial page returned to. 
 
-> NOTE: we're examining the *tail* as an example, but rest assured that the same is true for the *head* of the stack.
-
-Therefore if the visitor hits back again, we'll correct the state stored for `/docs`:
+Therefore, we can take what's correctly been put in state on the `/tutorial` page and overwrite what `/docs` has, and perhaps it will become handy if the user bounces from `/docs`. For example, we can now rewrite it as:
 
 
 ```js
@@ -438,10 +454,9 @@ window.history.state = {
 
 That way if the visitor clicks another external link from *that entry* and returns, `/docs` will once again have all the necessary info. The takeaway is that we are always able to insure the *tail* and *head* have **all** state stored for immediate return visits.
 
-> Respond will of course recognize what `index` you returned on and remove entries including`/tutorial` and subsequent--call it "tail optimization" :)--to once again mirror how the browser sees the stack.
+Lastly, Respond will of course recognize what `index` you returned on and remove subsequent entries to mirror how the browser sees the stack.
 
 We won't get into all the heuristics, but the head of the stack has similar behavior handling.
-
 
 
 ## Worst Case Scenario
@@ -451,7 +466,7 @@ So far we have covered what most developers think of when it comes to mirroring 
 The root of the challenge can be broken down into 4 hurdles:
 
 1. **Excessive Popping:** browser back/next buttons can change routes at will, and they can be tapped rapidly
-2. **Automatic Jumping:** Respond automatically convert push/replace actions into jumps when re-visiting adjacent URLs, as that's the preferable user experience
+2. **Automatic Jumping:** Respond automatically converts push/replace actions into jumps when re-visiting adjacent URLs, as that's the preferable user experience
 3. **Queue Transitions for Chrome:** chrome doesn't push new entries synchronously!! ([this is a bug](https://bugs.chromium.org/p/chromium/issues/detail?id=775391)) Therefore we need to queue them.
 4. **Explicit Commits:** route transitions can be long and asynchronous, and there can be changes to transitions midway (redirects + blocking)
 
@@ -477,7 +492,7 @@ state.location = {
   direciton: -1,
   entries: [
     entries: [
-      // previous entries left out for brevity
+      // previous entries omitted for brevity
       {
         type: 'LOGIN', // url: /login
         namespace: '',
@@ -513,7 +528,7 @@ state.location = {
       },
     ],
   ],
-  prev: {
+  from: { // route redirected from
     type: 'DASHBOARD', // url: /dashboard
     namespace: '',
     params: {},
@@ -523,6 +538,17 @@ state.location = {
     basename: '',
     key: '849305',
     index: 6,
+  },
+  prev: { // previous route
+    type: 'HOME', // url: /
+    namespace: '',
+    params: {},
+    query: {},
+    state: {},
+    hash: '',
+    basename: '',
+    key: '295834',
+    index: 7,
   },
 }
 ```
@@ -534,9 +560,7 @@ The solutions to these hurdles rests on 4 pillars:
 
 The first hurdle Respond must deal with is obviously that the user should now be on, say, *news.ycombinator.com* because he/she tapped the back button in excess of 7 times.
 
-Fortunately, Respond is a boss and *doesn't take shit from anyone*. 
-
-> For reader's whose first language isn't English, this means Respond doesn't allow it. 
+Fortunately, Respond doesn't allow this. 
 
 Respond's pop handler recognizes when the middleware pipeline is **"busy" as a result of a previous pop**. It then immediately **jumps one entry in the opposite direction to undo** this second pop. 
 
@@ -555,7 +579,7 @@ So at this point our entries are:
 
 ```js
 [
-  // committed
+  // previous entries ommitted
   '/login',
   '/dashboard',
   '/'
@@ -570,6 +594,7 @@ Instead of pushing `/dashboard` so the routes become:
 
 ```js
 entries: [
+  // previous entries ommitted
   '/login',
   '/dashboard',
   '/login'
@@ -581,6 +606,7 @@ or replacing so they become:
 
 ```js
 entries: [
+  // previous entries ommitted
   '/login',
   '/login',
   '/'
@@ -592,6 +618,7 @@ Respond is smart enough to know the real intent was to go back, **which means we
 
 ```js
 entries: [
+  // previous entries ommitted
   '/login',
   '/dashboard',
   '/'
@@ -609,219 +636,543 @@ There's one remaining problem: Chrome handles these pops asynchronously (both on
 
 **What problems does the added asynchrony cause us exactly?**
 
-- If any changes (such as blocked routes or redirects) happen before current pops complete, the browser + Respond will get **out of sync**
+- If any changes (such as blocked routes or redirects) happen before current pops complete, the browser + Respond will get **out of sync**, and from there all hell would break loose. We don't want that.
 
 To remedy this, Respond implements a **queue**, which guarantees subsequent history changes don't occur until the previous one is complete. The queue performs re-tries in short intervals of half an animation frame, 9 milliseconds.
 
-Now we're able to insure no history changes happen that Respond doesn't know about.
+Now we're able to insure no history changes happen that Respond doesn't know about. And since our middleware pipeline is built from the ground up around being asyncronous, it's no problem to *await* those extra 9 milliseconds, whereas with traditional routing solutions, this alone would pose a major problem requiring working arounds.
 
 
 ### 4. Explicit Commits ("Innocent Until Proven Guilty")
 
-Respond's middleware essentially treats new dispatches (triggered by browser buttons or UI elements) as `requests` to push the given URL. In other words: *"innocent until proven guilty."* 
+Respond's middleware essentially treats new dispatches as `requests` to push the given URL.
 
-Respond **normalizes** requests from the browser buttons vs. your UI elements to appear identically to most of the middleware pipeline. 
+Respond **normalizes** requests from the browser buttons so the middleware pipline can perceive them identically to actions triggered by UI events.
 
-That way when it comes to time to `commit` the change, it's just a matter of transending early pipeline  exits and **explicitly commiting the change of state at the same time as changes to the browser's history.**
+It then sends the `request` through a synchronous-feeling middleware pipeline that is easy to reason about.
 
-But just getting there is the difficult part. As you've seen from above, browser buttons + native pop handling can result in lots of unintended or less than ideal `history` changes which are tough to capture and normalize.
+Here *redirecting* and *blocking* is now trivial. As a result we have the foundation we need to implement a special kind of redirect under the hood to do the double jump back. 
+
+The double jump back may seem irregular, but as you can see from the options above, it's actually the best user experience. But this itself is just a means to an end.
+
+What this all gives us is stability. 
+
+Such scenarios present a high likelihood of getting out of sync. There are other scenarios. This is just one of several. Without describing them all, **if you don't have each and every one covered, the whole system breaks down.** History loses sync.
 
 
 ### Summary
 
-*Respond normalizes history changes to only let ideal changes pass through to state.* 
+If nothing else is accomplished from reading this article, understand that Respond takes it very seriously guaranteeing your app sees the same state as what your browser has in C++ somewhere. Respond doesn't just take you 80% of the way, and tell you to get out of the boat and swim to shore like most routers do. Respond considers all possible user experience heuristics like the *login, go back* scenario. 
 
-The thing to keep in mind with all this is that these issues come from the fact that Respond supports **async pipelines**, which is a major challenge, and a *world first* in its solving.
-
-Async pipelines enable things like asynchronous authentication, where it's expected that the route terminates ("blocks") if not validated . Callbacks can `return false` in that case.
-
-Examples:
-
-- if you want to block a user from leaving an incomplete checkout `return false` from `beforeLeave`. 
-- if you want to block a user from entering a page that requires age verification, `return false` from `beforeEnter`
-
-Async pipelines also enable redirects to somewhere else such as a login page (as in the above example).
-
-Most routers provide some very basic utilities for such capabilities. But with Respond, these things are first class. Respond is built around being able to do these things in style.
-
-> And believe us, *async piplines is something you want to do*. These are **THE MOST** requested features from [redux-first-router](https://github.com/faceyspacey/redux-first-router) which became the basis of Respond Framework. 
+And because of all that hard work, you can depend on the simplicity of route-dependent data requirements and fx. Hurray!
 
 
-## Multiple + Nested Stack Navigators
 
-Last but not least, we said we'd address the issue of multiple and nested stack navigators. Let's start with a single stack navigator.
 
-A single declarative stack navigator for your whole site is now straightforward:
 
-- take the entries in `state.location.entries`
-- power a `StackNavigator` component, presumably something like this:
+
+
+## Stack Navigators
+
+Last but not least, we said we'd address the issue of Stack Navigators, especially when you have multiple or nested ones. 
+
+Respond aims to keep a minimal surface area when it comes to components, thereby allowing you to draw on the standard ecosystem of React components. However, this is such an important problem (and one closely tied to routing) that after `<Link />` and `<Route />` components, the next one we plan to implement is a `<StackNavigator />`. 
+
+We haven't built it yet, but lets take a look at how we *can build* on Respond's' routing foundation to easily achieve such things. Consider below as a *sneak peak* of what's to come.
+
+To understand the challenges of multiple and nested navigators, let's first examine a single animated stack navigator. All it requires is 3 props:
+
+- `entries`
+- `index`
+- `direction`
 
 ```js
-const MyStack = (props, state, actions) => {
-  const { entries, index, direction } = state.location
+const MyStack = (props, { location, components }, actions) => {
+  const { entries, index, direction } = location
 
   return (
     <StackNavigator entries={entries} index={index} direction={direction}>
       {entry => {
-        const Component = components[entry.type] || components.default
+        const Component = findComponent(entry, components)
         return <Component {...entry} />
       }}
     </StackNavigator>
   )
 }
 
-const components = {
-  HOME: Home,
-  LOGIN: Login,
-  ETC: Etc,
-  default: Loading
+const findComponent = (entry, components) => {
+  switch(entry.type) {
+    case 'STEP1':
+      return components.OrderForm || components.Loading
+    case 'STEP2':
+      return components.PaymentDetails || components.Loading
+    case 'STEP3':
+      return components.Confirm || components.Loading
+    case 'STEP4':
+      return components.ThankYou || components.Loading
+    default:
+      return components.NotFound
+  }
 }
 ```
 
-The navigator wouldn't even be responsible for pushing/replacing/etc new screens.
+Now let's look at one of the components corresponding to one of the steps:
+
+```js
+const Confirm = (props, state, actions) => ({
+  <div>
+    <OrderDetails />
+    <Button onClick={actions.submitCheckout()}>PLACE ORDER</Button>
+  </div>
+})
+```
+
+Notice how there is no special props passed to the `Confirm` component. For example, `Confirm` isn't passed `props.navigation.navigate('ThankYou')` as in libraries like *react-navigation*. This is a good thing, as the goal is always *less API.* That's less for you to remember, learn, etc. 
+
+The standard Redux-inspired action dispatching Respond is built on is all you need. `StackNavigator` will be smart enough to know what to do when it sees the index has changed and a new entry is pushed on to the `entries` array. And of course the sliding animation will be based on the intelligent `direction` state Respond maintains.
+
+Here's what a complete `checkoutModule` for the above might look like:
+
+```js
+const checkoutModule = createApp({
+  components: {
+    MyStack,
+    OrderForm,
+    PaymentDetails,
+    Confirm,
+    ThankYou,
+    NotFound
+  },
+  routes: {
+    STEP1: '/step-1', // thunks related to steps omitted
+    STEP2: '/step-2',
+    STEP3: '/step-3',
+    STEP4: '/step-4',
+
+    // pathless route:
+    SUBMIT_CHECKOUT: ({ state }) => { 
+      const { success, reason } = api.post('checkout', state.order)
+
+      return success
+        ? actions.step4()
+        : actions.flashMessage('Checkout submission failed because ' + reason)
+    }
+  },
+  reducers: {
+    order
+  }
+})
+```
+
+To really understand the gloriousness of Respond's upcoming `StackNavigator` requires at least being familiar with the APIs of other stack navigators like [react-navigation](https://reactnavigation.org). Nevertheless, the takeaway is simply:
+
+**A fully loaded `StackNavigator` can be minimally and declaratively configured if correctness is guaranteed for what's contained in `entries`, `index`, and `direction`.**
+
+To paint the picture, let's look at the advanced use case of resetting: 
+
+```js
+SUBMIT_CHECKOUT: ({ state }) => { 
+  const { success, reason } = api.post('checkout', state.order)
+
+  return success
+    ? actions.step4()
+    : reason === 'order invalid'
+      ? actions.reset(['/home', '/step-1'])             // index 1 will automatically be inferred
+      : actions.reset(['/home', '/step-1', '/step-2'])  // payment details issue
+}
+```
+
+Respond is able to automatically determine that you want the sliding animation to be going backward. If you want to override it, you can set it:
+
+```js
+  actions.reset(['/home', '/step-1'], 1, 1) // the second 1 sets a forward direction
+```
+
+And it can handle complex scenarios where perhaps the index stays the same, and a completely different array of entries is used. Basically the `direction` prop--*which you control and has some sensible defaults for various scenarios*--dictates the sliding animation. 
+
+Performance is addressed by holding in memory hidden renderings for adjacent views, based on the entry action they are derived from. What you can display is completely dynamic based on how you choose to transform the entry. 
+
+So the one-to-one matching with the URL makes this stuff quite trivial, but how can we achieve the same thing for nested navigators? Can they no longer simply transform actions/entries into component views?? Do we need to dream up a `props.navigation.navigate` style API like *react-navigation*?
+
+### What if there was a way to populate the `StackNavigator` with just the entries from the history stack that its concerned with?
+
+Picture in additon to the above checkout, our mobile site also has a sidebar with a `StackNavigator`. The sidebar has the pages we're all too familiar with:
+
+- Account
+- Settings
+- Payment 
+- Help
+- Etc
+
+What happens if you're on `/step-2` and open the sidebar? Or click a link that takes you directly to the `Payment` page to view your default payment settings. Of course we want it to be as easy as just dispatching these actions:
+
+```js
+actions.settings()
+actions.payment()
+```
+
+Here's what our entries array would look like in the latter case:
+
+```js
+['/home', '/step-1', '/step-2', '/payment']
+```
+
+And let's say we edit our default payment method:
+
+```js
+['/home', '/step-1', '/step-2', '/payment', '/confirm-payment-change']
+```
+
+And let's say we have `/confirm-payment-change` wired to redirect you back to your checkout if you're in the middle of one:
+
+```js
+['/home', '/step-1', '/step-2', '/payment', '/confirm-payment-change', '/step-3']
+```
+
+
+What we now have is entries corresponding to 2 StackNavigators within our global history stack. 
+
+How do we reconcile the 2 navigators? What happens if you tap `back` within one of the given navigators? What happens to the other navigator? What happens to both the navigators when you tap the browser `back` button? 
+
+How do we handle advanced scenarios like resetting one of the navigators? We certainly have to make sure to leave entries corresponding to the other navigator untouched. 
+
+Most importantly, and in the first place, how do we *filter* a StackNavigator to just some of the entries? 
+
+For now let's just assume that we used 2 modules, each with their own namespace, to create the routes used in the 2 navigators. That allows us to filter the entries like this:
+
+```js
+const SidebarStack = (props, { location, components }, actions) => {
+  const entries = location.entries.filter(e => e.namespace === 'sidebar')
+  const index = ???
+  const direction = ???
+
+  return (
+    <StackNavigator entries={entries} index={index} direction={direction}>
+      {entry => {
+        const Component = findComponent(entry, components)
+        return <Component {...entry} />
+      }}
+    </StackNavigator>
+  )
+}
+```
+
+But what about the `index` and `direction`? 
+
+Let's start with the `index`.
+
+It turns out the `index` can be derived by this algorithm:
+
+- take the current global index
+- if the index directly corresponds to an entry filtered by a StackNavigator, you have the entry to display
+- if it *does not*, walk backward on the stack until you find the first entry that corresponds to the given StackNavigator
+- take the matched entry, discern which navigator(s) contain it in its filter set, and now you know the `index`
+
+There is one caveat, the same entry can appear multiple times in the filtered set, so just knowing its URL and using it to find its index in an array isn't enough. In reality, the simplest algorithm for index discovery coincides with filtering the entries. And also in reality, StackNavigators don't need to be passed `entries`, `index` and `direction` because they can get all this information from Respond `context`, just like you can with the 2nd `state` argument passed to your components. 
+
+Therefore our `StackNavigator` component can look just like this:
+
+```js
+<StackNavigator filter={entry => entry.namespace === 'checkout'}>
+  {(entry) => {
+    const Component = findComponent(entry, components)
+    return <Component {...entry} />
+  }}
+</StackNavigator>
+```
+
+And the algorithm for discerning the bits we need can all happen together under the hood:
+
+```js
+const StackNavigator = (props, state, actions) => {
+  const { filter, children: render } = props
+  const { entries, index } = filterEntries(filter, state.location)
+
+  const { direction } = state.location
+
+  const currentEntry = entries[index]
+  const previousEntry = entries[index - direction]
+
+  const currentComponent = render(currentEntry)
+  const previousComponent = render(previousEntry)
+
+  return renderSlidingAnimation(currentComponent, previousComponent, direction) // ommitted
+}
+
+const filterEntries = (filter, location) => {
+  const { entries, index } = location
+
+  return entries.reduce((acc, entry, i) => {
+    if(filter(entry)) {
+      acc.entries.push(entry)
+    }
+
+    // as you can see algorithmically its simplest to discern the index
+    // at the same time as filtering the entries
+    if (index === i) {
+      acc.index = acc.entries.length - 1
+    }
+
+    return acc
+  }, { entries: [], index: 0 })
+}
+```
+
+With this simple setup we've accomplished being able to use the global history stack as the **single source of truth** for multiple stack navigators!
+
+That means, you can use the browser back/next buttons, and each StackNavigator will know what to do. They will derive the correct index automatically, rather than require you to specify it. And all this can happen under the hood, since Respond components have direct access (using React `context`) to global `location` info.
+
+
+### But what if you want an easy `back` api for an individual StackNavigator?
+
+It turns out, we can use additional render props for that too:
+
+```js
+<StackNavigator filter={entry => entry.namespace === 'checkout'}>
+  {(entry, { back, canJump }) => {
+    const Component = findComponent(entry, components)
+
+    return (
+      <>
+        {canJump(-1) && <button onClick={back()}>back</button>}
+        <Component {...entry} />
+      </>
+    )
+  }}
+</StackNavigator>
+```
+
+*implementation:*
+
+```js
+const StackNavigator = (props, state, actions) => {
+  // ...
+  let { canJump } = modifySelectors(state)
+  let { back, next } = modifyActions(actions)
+  const currentComponent = render(currentEntry, { back, next, canJump, etc })
+  // ...
+}
+```
+
+We won't get into the exact implementation here, but the idea is the `StackNavigator` component can intervene and adjust the precise `back`, `canJump`, etc functions provided, modifying the core global ones.
+
+Going back to our original history stack, the result of jumping `back` within one navigator *over entries from another navigator* might look like this:
+
+
+- **BEFORE:** ['/home', '/step-1', '/step-2', '/payment', '/confirm-payment-change', ***'/step-3'***]
+
+- **AFTER:** ['/home', '/step-1', ***'/step-2'***, '/payment', '/confirm-payment-change', '/step-3']
+
+So that means all the modified `back` action must do is `jump` by 3. Incredible! It really is as simple as that.
+
+As far as `next`, the algorithm is even simpler: `push` is used, erasing all subsequent entries on all stacks, similar to the built-in global history stack behavior. The exception is if the entry pushed is already the `next` entry, which again is identical behavior to the global history stack.
+
+The thing to note about the `next` action is that it's less important than having a generic `back` action you can rely on. The reason is that for `next` you always must know where you're going, but with `back` providing that information is essentially redundant. Most importantly, it's great for prototyping to just put a `<BackButton />` and be done. 
+
+
+### Does back, canJump actions passed to components know they are in a StackNavigator?
+
+As mentioned, Respond components use React `context` to gain access to global routing information. Similar to how Respond namespaces modules to provide components with the correct `state` and `actions` arguments, Respond can make the necessary modifications if component is nested within a StackNavigator. 
+
+Using the `back` action and `canJump` selector therefore works the same everywhere:
+
+```js
+const BackButton = (props, { canJump }, { back }) => canJump(-1) ? (
+  <button onClick={back()}>
+    back
+  </button>
+) : null
+```
+
+
+### What about reseting just a specific navigator?
+
+Algorithmically that might look something like this:
+
+```js
+const checkoutEntries = entries.filter(e => e.namespace === 'checkout')
+const sidebarEntries = entries.filter(e => e.namespace === 'sidebar')
+
+// closing sidebar strategy:
+actions.reset(['/settings', ...checkoutEntries]) 
+
+// staying on sidebar strategy:
+actions.reset([...checkoutEntries, '/settings', '/payment']) 
+``` 
+
+What's the difference between the 2 strategies? 
+
+Well, that depends where you currently are. If you're on a checkout entry, then the first strategy will reset the other navigator behind the scenes, and the 2nd one will reset the current navigator, performing the appropriate sliding animation. That's pretty much all there is to it. 
+
+You can do this manually yourself in, for example, a route callback. Or, if you're within a StackNavigator, you can get help:
+
+```js
+<StackNavigator filter={entry => entry.namespace === 'checkout'}>
+  {(entry, { back, reset }) => {
+  // ... you know how the story ends
+```
+
+Here, `reset` will adjust just the current StackNavigator, automatically choosing one of the above 2 strategies. Or you could force them respectively like this:
+
+```js
+reset(entries, false) // force push entries to the head
+reset(entries, true)  // force push entries to the tail
+```
+
+In both those strategies, `reset` will set the index to that of the last entry in the array. However, you can manually set the `index` and `direction` with additional arguments, just like in the regular `reset` method.
+
+You can also pass an index to splice the entries into:
+
+```js
+reset(entries, 7)
+```
+
+
+### Resets Without Sliding Animations
+
+Occasionally you want to prevent the sliding animation on reset, and just immediately show the desired scene:
+
+```js
+reset(entries, false, entries.length - 0, 0)
+```
+
+By passing `0` for the `direction` no animation is used.
+
+
+### Secondary Entries
+
+It's your choice whether a given navigator scene has secondary entries that occur within it. If such is the case, you need a mechanism to further filter which entries trigger new scenes, and which do not. A `key` attached to the component returned from the render prop does the trick:
+
+```js
+<StackNavigator filter={entry => entry.namespace === 'checkout'}>
+  {(entry, { routes }) => {
+    const Component = findComponent(entry, components)
+    const key = routes[entry.type].scene
+    return <Component {...entry} key={key} />
+  }}
+</StackNavigator>
+```
+
+Keys can be generated any way you want. The overall idea is you need a way to group which routes belong on what scene. You can easily do that by attaching this information to your routes:
+
+```js
+routes: {
+    STEP1: {
+      path: '/step-1',
+      scene: 'step1'
+    },
+    FOO: {                    // non-navigator-changing route
+      path: '/step-1/foo',
+      scene: 'step1'
+    },
+    STEP2: {
+      path: '/step-2',
+      scene: 'step2'
+    },
+    BAR: {                    // non-navigator-changing route
+      path: '/step-2/foo',
+      scene: 'step2'
+    },
+    etc
+```
+
+ > If you can come up with an automatic strategy that doesn't require configuration information, go for it.
 
 
 
-## Hoisted Data Dependencies
+## Direct Visits & `initialEntries`
 
-History mirroring is a required capability in order for URL-driven data dependencies to be widely realizable. Without it, Respond can't make the claims it makes in regards to the widespread feasability of hoisted data deps.
+We've now seen the sort of advanced capabilities (e.g. Stack navigators) that can be built upon an information-complete foundation. We'd like to take a second to fill in one final gap you may not be aware of: 
 
-> OUR CLAIM: Respond makes it so 99.999% of all apps are better served hoisting their data dependencies to top level routing primitives associated with the URL. The chance you're app isn't one such app is slim to none.
+- **direct visits to scenes within Stack navigators**
 
-Therefore, it's no wonder the React  community gave up on fetching data based on what URL you're visiting--history mirroring, a key pre-requisite, was thought impossible.
+If you were to visit, say, step 3, in the above checkout, you'd need to insure the previous scenes are in the entries array so `back` functionality would work as expected, right?
 
-To be clear, [redux-first-router](https://github.com/faceyspacey/redux-first-router) didn't have history mirroring and was extraordinarily successful. But there are scenarios (stack navigators, wizards, etc) where it fell short. And for any solution to be *widely realizable* such holes cannot exist.
+In many scenarios you'd also need to insure various data was fetched via the middleware pipeline and route callbacks, right? 
 
-And to be even more clear, component-level approaches promoted in mainstream React also fell short. But in the inverse way. There the problem is "solved" by throwing linkability out the window. *Sure, you can have a stack navigator, but expect the URL to stay the same the whole time, or have unreliable browser back/next buttons.* That seemed to be the logic there.
-
-> Facebook's Relay in fact is based on hoisting data deps. So it's quite ironic that the React community at large advocates stuffing data deps in your component tree, only to get lost in the reactive labrynth that becomes your app. That is what Hooks and Suspense is about after all--making it so it's even easier to perform data fetching effects in the component tree.
-
-> But who uses Relay anyway? Apollo certainly has a far greater share of users. And Apollo is all about data fetching within nested components. 
-
-So how did we arrive at this state of affairs where fetching data in relation to the URL became an unwelcome option. Our assessment is that it was thought that React apps are too complex and have too many states in order to tie data dependencies to the URL. **But maybe they didn't have the right tools for the job.** 
-
-The problem in actuality was that there was no frictionless way to create URLs for each *state*. 
-
-
-
-### Definition of "State"
-
-But before we go on, we must define "state." What is meant is more like a "state" in [xstate](https://github.com/davidkpiano/xstate) and State Charts. 
-
-**Definition from the [xstate docs](https://xstate.js.org/docs/guides/states.html):** 
-
-> *"A state is an abstract representation of a system (such as an application) at a specific point in time. As an application is interacted with, events cause it to change state. A finite state machine can be in only one of a finite number of states at any given time."* 
-
-Coming from the Redux world, you may be thinking that what is meant by *"state"* is what's returned from your reducers. The correct association is actually events, or, in the case of Redux, *actions.* If you've used `xstate`, you know the equivalent of Redux store state is `context`. 
-
-Basically, in *xstate* `a state === a primaryAction`. 
-
-In Respond's case, those primary actions are route-triggering actions. The ones that change the URL. In terms of UI, route-triggering actions are a way of tagging primary points in the experience. 
-
-So what Respond does is provide *uniform resource indicators (URIs)* for the primary *points* of your app. 
-
-
-
-### The Point
-
-The next *point* to understand is that your app must be able to set itself up correctly whether that "point" is:
-
-- dispatched as the first action of the app (as in direct visits)
-- or when it's arrived at more naturally as part of a sequence of points leading up to it
-
-The latter is the easier case, and what your app is comprised of when using *routerless* Redux.
-
-> If you were ever someone who built an app with Redux, *but initially with no router*, and then had to incorporate URLs later and wished you could just tag certain actions as *URL-changing* actions, you know exactly what we're talking about. Hopefully at the time, you discovered [redux-first-router](https://github.com/faceyspacey/redux-first-router), which Respond evolved from.
-
-That is to say, apps are built every day that don't exist in the browser and don't need to associate UI states with precise URLs. And that's what building a routerless app with Redux is like. If you've ever been in that enviable position, you likely felt far more in control of your app vs. the struggle of coordinating URL state with UI state plus *further* domain state. 
-
-> Respond, by the way, is all about *all 3 forms of state* living under one roof, while letting you transparently build your app as if the address bar doesn't exist. Yet while still giving your app deep linkability and the benefits of best practices and architecture that come along with said uniform resource indicators.
-
-So routerless Redux apps didn't have the problem of direct visits. Most states can only be reached after specific prior states. Rather, most actions are never dispatched unless specific prior actions are dispatched. Therefore, such apps don't have to deal with, say, a direct visit to step 4 of your checkout wizard or stack navigator. They don't have to replay 3 previous URLs in the address bar in order for reducers to be supplying the correct state. They couldn't even if they tried...*until now.*
-
-Building a React Native app without deep links is an example of this enviable position. The app has just a single entry state, and if you're doing you're job, it usually picks up where you left off through [redux-persist](https://github.com/rt2zz/redux-persist) which remembers your last used state. In fact *redux-first-router* was born precisely out of the need to tag actions in a React Native app with URLs to make it deep-linkable without drastically changing the architecture and codebase (god forbid, having to do things like recompose React Router everywhere).
-
-
-### State Indirection and Sticky Components
-
-We have one remaining pillar that must be understood to prop up this foundation.
-
-As describe in the [Route component](components.md#pro-tip-match-state-instead) doc, traditional routing libraries like *React Router* display components by matching *directly against the URL*, whereas Respond uses the additional indirection of `state` in order to determine what to display.
-
-So in **naive component-based** routing, match determination is made like this:
-
-- `path in address bar => component`
-
-But with Respond, you have an additional point of *indirection*:
-
-- `path =>` **`state`** `=> component`
-
-
-It's a sutble difference, but the implications for your app are immense. 
-
-Essentially, one is dumb:
-
-- `App = f(path)`
-
-And the other far smarter due to its longer memory:
-
-- `state = reduce(actions); App = f(state)`
-
-
-So much has been ingrained in React developers in regards to displaying components based on a one-to-one pairing to what's in the URL. So it may not be immediately obvious. But in the Respond World, the URL is just a *suggestion* for what to display. Reducers have the final say, and ultimately provide a lot more flexibility.
-
-What this allows for is *"sticky"* components that stay in state, even as new URLs dispatch actions. For example, a screen could stay consistent behind a modal that is triggered by its own URL, such as: `/modal`.
-
-**After all, *routerless* Redux apps are perfectly capable of displaying whatever they want, as new actions come in.**
-
-
-
-### Bringing It All Together
-
-
-So we now understand:
-
-- A) that our apps are made up of precise "points" with their own uniform resource locators (URLs), but
-- B) each URL may not be equipped to setup all state on its own (it's dependent on previous actions/URLs), and
-- C) URLs of course must be able to be visited directly *(because after all, any URL visited once can be shared by a user)*
-
-So we need a natural solution to handle direct visits.
-
-In the [redux-first-router](https://github.com/faceyspacey/redux-first-router) days the best we could aspire to was redirects to the closest most natural route. And that's still an option today.
-
-But that sacrificies much juicy context that links are supposed provide. And worse, under such conditions, we can't build Stack Navigators because browser back/next buttons are not reliable. 
-
-So without further ado, the solution is `route.initialEntries`, an option to rewrite the history stack on direct visit to such a URL. For example on direct visit to: `/checkout/step-4`, we could rewrite the stack to:
+What you need is this capability:
 
 ```js
 route.initialEntries = [
   '/checkout/step-1',
   '/checkout/step-2',
-  '/checkout/step-3',
-  '/checkout/step-4',
+  '/checkout/step-3'
 ]
 ```
 
-> And of course there's a function form for complex scenarios. Check [advanced route config](./advanced-route-config.md) for complete reference.
+as well as in dynamic function form:
 
-This insures reducers are in their appropriate places, and it even insures any data dependencies from all routes are fetched.
+```js
+route.initialEntries = (request, action) => {
+  return [
+    '/checkout/step-1',
+    '/checkout/step-2',
+    '/checkout/step-3'
+  ]
+}
+```
 
-**And that's why history mirroring is required for URL-driven data dependencies (aka "hoisted data deps") to reign supreme once again.**
+What this does is force the browser to visit these routes as quickly as possible, replaying them. It's done on initial *load* of your app only, calling all middleware and callbacks along the way.
 
-So our recommendation is to think twice about all the data fetching you're spreading and nesting throughout your component tree, and prepare to unlearn no longer needed *worst practices*. You're making mazes out of your apps and you will never find your way out. Give Respond a try if you're unsure. There's only one way to find out if what we speak is truth.
+This guarantees the necessary state is produced for `/checkout/step-3` to behave correctly.
+
+You can't do such things without the capability to rewrite the history stack. Forget about it!
+
+### DRY ("Don't Repeeat Yourself")
+
+Lastly, it's important to note that you can also provide `initialEntries` on a parent route that groups a bunch of child routes. By doing so, you only have to specify it once:
+
+```js
+routes: {
+  PARENT: {
+    routes: {
+      STEP1: '/checkout/step-1',
+      STEP2: '/checkout/step-2',
+      STEP3: '/checkout/step-3'
+    },
+    initialEntries: [
+      '/checkout/step-1',
+      '/checkout/step-2',
+      '/checkout/step-3'
+    ]
+  }
+}
+```
+
+And by doing so, the initial entries will automatically replay the routes up until the  directly visited route. That way you don't have to provide `initialEntries` multiple times for each and every route in the wizard or stack navigator. If you so choose, you can override what a parent provides by specifying a different value for `initialEntries` on the child.
 
 
 
-### Other Strategies
+## Hoisted Data Dependencies + Effects
 
-Along with redirects, there is several other solutions when you don't require the complexity of Stack Navigators:
 
-- nested modules (data can be fetched for initial entrance of any route within a given module)
-- inherited callbacks (you can share callbacks across multiple similar routes that have the same data deps)
-- and redirects as mentioned above
+By now it should be clear why Respond invested so much in not just history mirroring but also history manipulation capabilities: 
 
-Together along with having an asynchronous pipeline, these strategies provide the fertile ground necessary for URLs to drive your app instead of arbitrary hard to find lifecycle handlers or hooks in your components which inevitably will have you spinning in circles debugging. Hooks are great, but don't need to take over your app. From Respond's standpoint, they are the "low level API." Save them for when you truly need them.
+- **It's a required pre-requisite for hoisting data dependencies and side-effects to the route level** ***in all scenarios.***
+- Effects grouped and orchestrated together linearly in a single place is the correct most natural way they should be addressed if possible, not randomly discovered in component trees.
+- High quality apps and user experiences must avoid shortcuts at all costs. From an app development experience, it's trivial and natural to do things like specify an `initialEntries` route option. The browser shouldn't present roadblocks to such things *just working.*
 
+Features like `initialEntries` and the automatic replay on direct visits may seem like a stretch (it sure took us a lot of work!). And there are ways to get around it, for example the aforementioned less desirable redirect strategy. However we determined it necessary to insure the route level approach wasn't a leaky abstraction, even if most apps don't require features like StackNavigators. Our prediction is that will change in the future.
+
+Development is all about the "right tool for the job." And the right tool for effects is something that linearly groups them together. The component level stuff that rose to prominence for a while was a stop-gap because all these things weren't in place. You shouldn't be forced to think of your app at a *microscopic* level (component level fetching), when the *macro* big picture of your app clearly designates that a given URL or area of your app has certain dependencies.
+
+There are certain things that still make a lot of sense being developed with the "low level" React API. For example, the Facebook chat widget served on their desktop site for years. That's a great use case for Hooks and Suspense. 
+
+Respond isn't at odds with React. It's a perfect combination. The Facebook chat widget  could be naturally built the Respond way with "sticky components" and routes. But there may be good reasons doing it with traditional component level strategies makes the most sense for your app. And you can do such things directly within a shell provided by Respond.
+
+Respond simply adds a *macro* way for your app to be modular **in addition** to *micro* component modularity.
+
+
+In conclusion, history mirroring + manipulation is a required capability in order for URL-driven data dependencies to be widely realizable. Without it, Respond can't make the claims it makes in regards to the widespread feasability of hoisted data deps.
+
+> OUR CLAIM: The majority of features we build are better served hoisting data deps. Even rare features like chat widgets can easily be built with Respond routes and modules. The chance that what you're building can't be naturally built at the route level is slim to none. The Respond architecture is now a required tool in your toolbox.
+
+
+And if you're wondering why much of the React community has given up on hoisted deps until now, it's that the reliability was leaky at best. And most commonly, it was non-existent. After all, history mirroring and manipulation had never been generally achieved until now. *There's no package you can get on NPM to do just the history control part of Respond.* 
+
+The overall outcome is that a proven and reliably approach from the server-side world--due to its linear execution--has been unable to flourish. Let's face it, sneaking activities that make sense together into pockets of component tree branches isn't a better developer experience. It's a tradeoff made to achieve component modularity. However, if you can do either one, depending on what the situation calls for, you're going to be in the DX sweet spot. 
+
+What we have found is that 75-100% of data-dependent features are part of the *main application flow* where Respond is the clear winner. The the rest are exceptions like the chat widget where Hooks + Suspense is a fine option for data-fetching.
 
 
 ## Final Thoughts
@@ -837,4 +1188,9 @@ This obviously was an important article in terms of *Respond theory.* It's not n
 
 *you can treat commits to the address bar no differently than commits to state*
 
-*you have the space before and after to seamessly do what you like, workarounds not required.*
+*you have the space before and after commits to seamessly do what you like, workarounds not required*
+
+*and if you need you can rewrite history*
+
+*you finally have a foundation to build things that depend on the browser's hidden history state.*
+

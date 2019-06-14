@@ -468,7 +468,7 @@ The root of the challenge can be broken down into 4 hurdles:
 1. **Excessive Popping:** browser back/next buttons can change routes at will, and they can be tapped rapidly
 2. **Automatic Jumping:** Respond automatically converts push/replace actions into jumps when re-visiting adjacent URLs, as that's the preferable user experience
 3. **Queue Transitions for Chrome:** chrome doesn't push new entries synchronously!! ([this is a bug](https://bugs.chromium.org/p/chromium/issues/detail?id=775391)) Therefore we need to queue them.
-4. **Explicit Commits:** route transitions can be long and asynchronous, and there can be changes to transitions midway (redirects + blocking)
+4. **Request to Commit:** route transitions can be long and asynchronous, and there can be changes to transitions midway (redirects + blocking)
 
 
 
@@ -643,28 +643,28 @@ To remedy this, Respond implements a **queue**, which guarantees subsequent hist
 Now we're able to insure no history changes happen that Respond doesn't know about. And since our middleware pipeline is built from the ground up around being asyncronous, it's no problem to *await* those extra 9 milliseconds, whereas with traditional routing solutions, this alone would pose a major problem requiring working arounds.
 
 
-### 4. Explicit Commits ("Innocent Until Proven Guilty")
+### 4. Requests to Commit
 
-Respond's middleware essentially treats new dispatches as `requests` to push the given URL.
+Respond's middleware essentially treats new dispatches as *requests* to push the given URL. The URL isn't changed until the middleware pipeline commits it. This is an *inversion of control* over the normal way route transitions are made (immediately when imperatively triggered).
 
-Respond **normalizes** requests from the browser buttons so the middleware pipline can perceive them identically to actions triggered by UI events.
+Respond **normalizes** requests from the browser buttons so the middleware pipline can perceive them identically to actions triggered by UI events. In both cases, they are uncommitted *requests*. 
 
-It then sends the `request` through a synchronous-feeling middleware pipeline that is easy to reason about.
+It then sends the `request` through a synchronous-feeling middleware pipeline that is easy to reason about. *This is the crown jewel we are shooting for.*
 
-Here *redirecting* and *blocking* is now trivial. As a result we have the foundation we need to implement a special kind of redirect under the hood to do the double jump back. 
+Here *redirecting* and *blocking* is trivial, provided we mirror the browser's history stack as we go.
 
-The double jump back may seem irregular, but as you can see from the options above, it's actually the best user experience. But this itself is just a means to an end.
+The double jump back may seem irregular, but as you can see from the options above, it's actually the best and natural user experience. Such scenarios present a high likelihood of getting out of sync. There are other scenarios. This is just one of several. Without describing them all, **if you don't have each and every one covered, the whole system breaks down.** History loses sync.
 
-What this all gives us is stability. 
+So building route transitions around *requests* is less of a "solution" to our nightmare scenario, and more of our *primary goal* that we must uphold. It's where the redirect seamlessly happened after all. But by upholding it its linear nature, we also give ourselves a stable environment to move and control the history track underneath it. 
 
-Such scenarios present a high likelihood of getting out of sync. There are other scenarios. This is just one of several. Without describing them all, **if you don't have each and every one covered, the whole system breaks down.** History loses sync.
+The request pipeline and the fully managed history stack work hand in hand to provide a stable linear code execution pipeline so you don't have to worry about it.
 
 
 ### Summary
 
-If nothing else is accomplished from reading this article, understand that Respond takes it very seriously guaranteeing your app sees the same state as what your browser has in C++ somewhere. Respond doesn't just take you 80% of the way, and tell you to get out of the boat and swim to shore like most routers do. Respond considers all possible user experience heuristics like the *login, go back* scenario. 
+If nothing else is accomplished from reading this article, understand that Respond takes it very seriously guaranteeing your app sees the same state as what your browser has in C++ somewhere. Respond doesn't just take you 80% of the way, and tell you to get out of the boat and swim to shore like most routers do. Respond considers all possible user experience heuristics like the *login, go back* scenario, which admittedly is a very rare scenario most apps leave as product holes, hoping users dont encounter them. 
 
-And because of all that hard work, you can depend on the simplicity of route-dependent data requirements and fx. Hurray!
+Because of all that hard work, you can depend on the simplicity of route-dependent data requirements and fx. Hurray!
 
 
 
@@ -674,11 +674,11 @@ And because of all that hard work, you can depend on the simplicity of route-dep
 
 ## Stack Navigators
 
-Last but not least, we said we'd address the issue of Stack Navigators, especially when you have multiple or nested ones. 
+Last but not least, we said we'd address the issue of Stack Navigators, especially when you have multiple or nested ones. In fact, Stack Navigators is less of an issue, and more of a the crowning achievement that proves we did everything right. While not seen often on web, we believe that with Respond they will become commonplace.
 
-Respond aims to keep a minimal surface area when it comes to components, thereby allowing you to draw on the standard ecosystem of React components. However, this is such an important problem (and one closely tied to routing) that after `<Link />` and `<Route />` components, the next one we plan to implement is a `<StackNavigator />`. 
+When it comes to components, Respond keeps a minimal surface area, thereby allowing you to draw on the standard ecosystem of React components. However, this is so important (and one closely tied to routing) that after `<Link />` and `<Route />` components, the next one we plan to implement is a `<StackNavigator />`. 
 
-We haven't built it yet, but lets take a look at how we *can build* on Respond's' routing foundation to easily achieve such things. Consider below as a *sneak peak* of what's to come.
+We haven't built it yet, but lets take a deep dive into how we *can build* on Respond's' routing foundation to easily achieve such things. Consider below as a *sneak peak* of what's to come.
 
 To understand the challenges of multiple and nested navigators, let's first examine a single animated stack navigator. All it requires is 3 props:
 
@@ -729,7 +729,7 @@ const Confirm = (props, state, actions) => ({
 
 Notice how there is no special props passed to the `Confirm` component. For example, `Confirm` isn't passed `props.navigation.navigate('ThankYou')` as in libraries like *react-navigation*. This is a good thing, as the goal is always *less API.* That's less for you to remember, learn, etc. 
 
-The standard Redux-inspired action dispatching Respond is built on is all you need. `StackNavigator` will be smart enough to know what to do when it sees the index has changed and a new entry is pushed on to the `entries` array. And of course the sliding animation will be based on the intelligent `direction` state Respond maintains.
+The standard Redux-inspired action dispatching Respond is built on is all you need. `StackNavigator` will be smart enough to know what to do when it sees the `index` has changed and a new entry is pushed on to the `entries` array. And of course the sliding animation will be based on the intelligent `direction` state Respond maintains.
 
 Here's what a complete `checkoutModule` for the above might look like:
 
@@ -788,7 +788,7 @@ Respond is able to automatically determine that you want the sliding animation t
   actions.reset(['/home', '/step-1'], 1, 1) // the second 1 sets a forward direction
 ```
 
-And it can handle complex scenarios where perhaps the index stays the same, and a completely different array of entries is used. Basically the `direction` prop--*which you control and has some sensible defaults for various scenarios*--dictates the sliding animation. 
+And it can handle complex scenarios where perhaps the index stays the same, and a completely different array of entries is used. Basically the `direction` prop--*which you control and has some sensible defaults for various scenarios*--dictates the sliding animation. And we will never see more than one scene slide by with Respond, as you sometimes do when other navigators are reset. Each change to the location state will at most result in one sliding animation.
 
 Performance is addressed by holding in memory hidden renderings for adjacent views, based on the entry action they are derived from. What you can display is completely dynamic based on how you choose to transform the entry. 
 
@@ -863,12 +863,14 @@ Let's start with the `index`.
 
 It turns out the `index` can be derived by this algorithm:
 
-- take the current global index
-- if the index directly corresponds to an entry filtered by a StackNavigator, you have the entry to display
+- take the current global index and the entry it corresponds to
+- if the entry corresponds to one filtered by the StackNavigator, you have a match
 - if it *does not*, walk backward on the stack until you find the first entry that corresponds to the given StackNavigator
-- take the matched entry, discern which navigator(s) contain it in its filter set, and now you know the `index`
+- in ***either case***, take the matched entry, and search the filtered entries for the first entry with a matching URL, and it's `index` is it
 
-There is one caveat, the same entry can appear multiple times in the filtered set, so just knowing its URL and using it to find its index in an array isn't enough. In reality, the simplest algorithm for index discovery coincides with filtering the entries. And also in reality, StackNavigators don't need to be passed `entries`, `index` and `direction` because they can get all this information from Respond `context`, just like you can with the 2nd `state` argument passed to your components. 
+There is one caveat, the same entry can appear multiple times in the filtered set, so just knowing its URL and using it to find its index in an array isn't enough. In reality, the simplest algorithm for index discovery is *best performed while filtering the entries*. 
+
+Also, StackNavigators don't need to be passed `entries`, `index` and `direction` because they can get all this information from Respond `context`, just like you can with the 2nd `state` argument passed to your components. 
 
 Therefore our `StackNavigator` component can look just like this:
 
@@ -881,24 +883,35 @@ Therefore our `StackNavigator` component can look just like this:
 </StackNavigator>
 ```
 
-And the algorithm for discerning the bits we need can all happen together under the hood:
+***That's it!***
+
+
+### Implementation
+
+But this intentionally lengthy article isn't just about getting to know Respond's API surface. Here our goal is to get down to the nuts and bolts of things, and learn the *why* and the *how* of everything. 
+
+Let's take a look at the core aspects of an implementation:
 
 ```js
 const StackNavigator = (props, state, actions) => {
   const { filter, children: render } = props
-  const { entries, index } = filterEntries(filter, state.location)
+  const { entries, index } = filterEntries(filter, state.location) // tuck our algorithm away in here
 
   const { direction } = state.location
 
   const currentEntry = entries[index]
-  const previousEntry = entries[index - direction]
+  const previousEntry = entries[index - direction] // find adjacent entry to slide away
 
   const currentComponent = render(currentEntry)
   const previousComponent = render(previousEntry)
 
-  return renderSlidingAnimation(currentComponent, previousComponent, direction) // ommitted
+  return renderSlidingAnimation(currentComponent, previousComponent, direction) // omitted
 }
+```
 
+And now the algorithm for combined filtering and index discovery:
+
+```js
 const filterEntries = (filter, location) => {
   const { entries, index } = location
 
@@ -907,10 +920,10 @@ const filterEntries = (filter, location) => {
       acc.entries.push(entry)
     }
 
-    // as you can see algorithmically its simplest to discern the index
-    // at the same time as filtering the entries
+    // as you can see algorithmically its simplest and more performant (requires the least
+    // number of passes) to discern the index at the same time as filtering the entries
     if (index === i) {
-      acc.index = acc.entries.length - 1
+      acc.index = acc.entries.length - 1 // the length at this iteration is the hint we seek
     }
 
     return acc
@@ -920,12 +933,12 @@ const filterEntries = (filter, location) => {
 
 With this simple setup we've accomplished being able to use the global history stack as the **single source of truth** for multiple stack navigators!
 
-That means, you can use the browser back/next buttons, and each StackNavigator will know what to do. They will derive the correct index automatically, rather than require you to specify it. And all this can happen under the hood, since Respond components have direct access (using React `context`) to global `location` info.
+That means, you can use the browser back/next buttons, and each StackNavigator will know what to do. They will derive the correct index automatically, rather than require you to specify it. And all this can happen under the hood, since Respond components have direct access (using React `context`) to global `location` state.
 
 
 ### But what if you want an easy `back` api for an individual StackNavigator?
 
-It turns out, we can use additional render props for that too:
+It turns out, we can use additional render props/arguments for that too:
 
 ```js
 <StackNavigator filter={entry => entry.namespace === 'checkout'}>
@@ -959,20 +972,20 @@ We won't get into the exact implementation here, but the idea is the `StackNavig
 Going back to our original history stack, the result of jumping `back` within one navigator *over entries from another navigator* might look like this:
 
 
-- **BEFORE:** ['/home', '/step-1', '/step-2', '/payment', '/confirm-payment-change', ***'/step-3'***]
+- **BEFORE:** ['/home', '/step-1', '/step-2', '/payment', '/confirm-payment-change', ***'/step-3'***], index: 5
 
-- **AFTER:** ['/home', '/step-1', ***'/step-2'***, '/payment', '/confirm-payment-change', '/step-3']
+- **AFTER:** ['/home', '/step-1', ***'/step-2'***, '/payment', '/confirm-payment-change', '/step-3'], index: 2
 
 So that means all the modified `back` action must do is `jump` by 3. Incredible! It really is as simple as that.
 
 As far as `next`, the algorithm is even simpler: `push` is used, erasing all subsequent entries on all stacks, similar to the built-in global history stack behavior. The exception is if the entry pushed is already the `next` entry, which again is identical behavior to the global history stack.
 
-The thing to note about the `next` action is that it's less important than having a generic `back` action you can rely on. The reason is that for `next` you always must know where you're going, but with `back` providing that information is essentially redundant. Most importantly, it's great for prototyping to just put a `<BackButton />` and be done. 
+The thing to note about the `next` action is that it's less important than having a generic `back` action you can rely on. The reason is that for `next` you always must know where you're going, but with `back` providing that information is essentially redundant. Stack navigators are like a linked list, and the "link" is only required in one direction. Most importantly, it's great for prototyping to reliably put a `<BackButton />` and be done. 
 
 
 ### Does back, canJump actions passed to components know they are in a StackNavigator?
 
-As mentioned, Respond components use React `context` to gain access to global routing information. Similar to how Respond namespaces modules to provide components with the correct `state` and `actions` arguments, Respond can make the necessary modifications if component is nested within a StackNavigator. 
+As mentioned, Respond components use React `context` to gain access to global routing information. Similar to Respond module namespacing implementation, Respond can make the necessary modifications if a component is nested within a StackNavigator. 
 
 Using the `back` action and `canJump` selector therefore works the same everywhere:
 
@@ -1041,7 +1054,7 @@ By passing `0` for the `direction` no animation is used.
 
 ### Secondary Entries
 
-It's your choice whether a given navigator scene has secondary entries that occur within it. If such is the case, you need a mechanism to further filter which entries trigger new scenes, and which do not. A `key` attached to the component returned from the render prop does the trick:
+It's your choice whether a given navigator scene has secondary entries that occur within it. If such is the case, you need a mechanism to further filter which entries trigger new scenes, and which do not. A `key` prop passed to the component returned from the render prop does the trick:
 
 ```js
 <StackNavigator filter={entry => entry.namespace === 'checkout'}>
@@ -1063,7 +1076,7 @@ routes: {
     },
     FOO: {                    // non-navigator-changing route
       path: '/step-1/foo',
-      scene: 'step1'
+      scene: 'step1'          // see, it has the same scene key as STEP1
     },
     STEP2: {
       path: '/step-2',
@@ -1071,7 +1084,7 @@ routes: {
     },
     BAR: {                    // non-navigator-changing route
       path: '/step-2/foo',
-      scene: 'step2'
+      scene: 'step2'          // see, it has the same scene key as STEP2
     },
     etc
 ```
@@ -1082,7 +1095,7 @@ routes: {
 
 ## Direct Visits & `initialEntries`
 
-We've now seen the sort of advanced capabilities (e.g. Stack navigators) that can be built upon an information-complete foundation. We'd like to take a second to fill in one final gap you may not be aware of: 
+We've now seen the sort of advanced capabilities (e.g. stack navigators) that can be built upon an information-complete foundation. We'd like to take a second to fill in one final gap you may not be aware of: 
 
 - **direct visits to scenes within Stack navigators**
 
@@ -1112,7 +1125,9 @@ route.initialEntries = (request, action) => {
 }
 ```
 
-What this does is force the browser to visit these routes as quickly as possible, replaying them. It's done on initial *load* of your app only, calling all middleware and callbacks along the way.
+What this does is force the browser to visit these routes as quickly as possible, replaying them. It's done on initial *load* of your app only, calling all middleware and callbacks along the way. 
+
+> That means different routes can have an `initialEntries`, and it's only called when the given route is the route the app loads on.
 
 This guarantees the necessary state is produced for `/checkout/step-3` to behave correctly.
 
@@ -1120,7 +1135,7 @@ You can't do such things without the capability to rewrite the history stack. Fo
 
 ### DRY ("Don't Repeeat Yourself")
 
-Lastly, it's important to note that you can also provide `initialEntries` on a parent route that groups a bunch of child routes. By doing so, you only have to specify it once:
+Lastly, it's important to note that you can also provide `initialEntries` *once* on a parent route that groups a bunch of child routes:
 
 ```js
 routes: {
@@ -1152,15 +1167,19 @@ By now it should be clear why Respond invested so much in not just history mirro
 - Effects grouped and orchestrated together linearly in a single place is the correct most natural way they should be addressed if possible, not randomly discovered in component trees.
 - High quality apps and user experiences must avoid shortcuts at all costs. From an app development experience, it's trivial and natural to do things like specify an `initialEntries` route option. The browser shouldn't present roadblocks to such things *just working.*
 
-Features like `initialEntries` and the automatic replay on direct visits may seem like a stretch (it sure took us a lot of work!). And there are ways to get around it, for example the aforementioned less desirable redirect strategy. However we determined it necessary to insure the route level approach wasn't a leaky abstraction, even if most apps don't require features like StackNavigators. Our prediction is that will change in the future.
+Features like `initialEntries` and the automatic replay on direct visits may seem like a stretch (it sure took us a lot of work!). And there are ways to get around it, for example the aforementioned less desirable redirect strategy. When regular React apps have stack navigators, they "solve it" by avoiding making changes to the URL all together! 
 
-Development is all about the "right tool for the job." And the right tool for effects is something that linearly groups them together. The component level stuff that rose to prominence for a while was a stop-gap because all these things weren't in place. You shouldn't be forced to think of your app at a *microscopic* level (component level fetching), when the *macro* big picture of your app clearly designates that a given URL or area of your app has certain dependencies.
+However we determined it necessary to insure the route level approach wasn't a leaky abstraction, even if most apps don't require features like StackNavigators. Our prediction, however, is that will change in the future.
+
+Development is all about the "right tool for the job." And the right tool for effects is something that linearly groups them together. We're essentially taking effects spread randomly throughout your component tree and putting them back in order, the way they're supposed to be.
+
+The component level stuff that rose to prominence for a while was a stop-gap because all these things weren't in place. You shouldn't be forced to think of your app at a *microscopic* level (component level fetching), when the *macro* big picture of your app clearly designates that a given URL or area of your app has certain dependencies.
 
 There are certain things that still make a lot of sense being developed with the "low level" React API. For example, the Facebook chat widget served on their desktop site for years. That's a great use case for Hooks and Suspense. 
 
-Respond isn't at odds with React. It's a perfect combination. The Facebook chat widget  could be naturally built the Respond way with "sticky components" and routes. But there may be good reasons doing it with traditional component level strategies makes the most sense for your app. And you can do such things directly within a shell provided by Respond.
+Respond isn't at odds with React. It's a perfect combination. The Facebook chat widget  could be naturally built the Respond way with "sticky components" and routes. But there may be good reasons doing it with traditional component level strategies makes the most sense for your app. And you can do such things directly within a shell provided by Respond. The few occasions that's a right fit feel so much better with Respond providing overall flow and conventions.
 
-Respond simply adds a *macro* way for your app to be modular **in addition** to *micro* component modularity.
+Generally speaking, Respond adds a *macro* way for your app to be modular **in addition** to *micro* component modularity.
 
 
 In conclusion, history mirroring + manipulation is a required capability in order for URL-driven data dependencies to be widely realizable. Without it, Respond can't make the claims it makes in regards to the widespread feasability of hoisted data deps.
@@ -1168,16 +1187,18 @@ In conclusion, history mirroring + manipulation is a required capability in orde
 > OUR CLAIM: The majority of features we build are better served hoisting data deps. Even rare features like chat widgets can easily be built with Respond routes and modules. The chance that what you're building can't be naturally built at the route level is slim to none. The Respond architecture is now a required tool in your toolbox.
 
 
-And if you're wondering why much of the React community has given up on hoisted deps until now, it's that the reliability was leaky at best. And most commonly, it was non-existent. After all, history mirroring and manipulation had never been generally achieved until now. *There's no package you can get on NPM to do just the history control part of Respond.* 
+And if you're wondering why much of the React community has given up on hoisted deps until now, it's that the reliability was leaky at best. And most commonly, it was non-existent. There answer seems to have been: "forget about the URL, just keep it the same," as stack navigators and similar kinds of components have demonstrated.
 
-The overall outcome is that a proven and reliably approach from the server-side world--due to its linear execution--has been unable to flourish. Let's face it, sneaking activities that make sense together into pockets of component tree branches isn't a better developer experience. It's a tradeoff made to achieve component modularity. However, if you can do either one, depending on what the situation calls for, you're going to be in the DX sweet spot. 
+After all, history mirroring and manipulation had never been generally achieved until now. *There's no package you can get on NPM to do just the history control part of Respond.* 
 
-What we have found is that 75-100% of data-dependent features are part of the *main application flow* where Respond is the clear winner. The the rest are exceptions like the chat widget where Hooks + Suspense is a fine option for data-fetching.
+The overall outcome is that a proven and reliable approach from the server-side world--due to its linear execution--has been unable to flourish in a client-centric world. Let's face it, sneaking activities that make sense together into pockets of component tree branches isn't a better developer experience. It's a tradeoff made to achieve component modularity. However, if you can do both, depending on what the situation calls for, you're going to be in the DX sweet spot. 
+
+What we have found is that 75-100% of data-dependent features are part of the *main application flow* where Respond is the clear winner. The the rest are exceptions like the chat widget where Hooks + Suspense is a fine option for data-fetching, depending on your needs. But again, Respond's "sticky components" + routes also works beautifully for such component modules.
 
 
 ## Final Thoughts
 
-This obviously was an important article in terms of *Respond theory.* It's not necessarily important *in practice*. Novice developers can disregard it if it doesn't make complete sense. More advanced developers can stride more confidently, knowing what's going on under the hood and why we chose the approach we chose.
+This obviously was an important article in terms of *Respond theory.* It's not necessarily important *in practice*. Novice developers can disregard it if it doesn't make complete sense. More advanced developers can stride more confidently, knowing what's going on under the hood and why we chose the approach we chose. **Long live linear execution!**
 
 
 **Meditation:**

@@ -2,7 +2,9 @@
 
 Colocated components fulfill the same basic premise as they originally did in Relay, and similar to Apollo. 
 
-The way they work is actually quite ingenius. A parent module loads one, and since the `load` callback is *always called first*, all of the child's callbacks get a chance to fire. Then child components are guaranteed to have their fetched data.
+But Respond has a different set of constraints: **a given URL must dictate ALL dependencies (data, fx, etc).**
+
+The way co-located components work in Respond is actually quite ingenius. A parent module loads *one*, and since the `load` callback is *always called first*, all of the child's callbacks get a chance to fire. Then child components are guaranteed to have their fetched data.
 
 The trick is to just create a route with the reserved name **"entry"** and all of its callbacks will be merged into the parent route:
 
@@ -41,7 +43,7 @@ export default ({
   callbacks: {
     beforeEnter = 'beforeEnter',
     thunk = 'thunk',
-    onEnter = 'oneEnter'
+    onEnter = 'onEnter'
   }
 }) => createModule({
   routes: {

@@ -523,6 +523,22 @@ Lastly, the `complete` middleware gives you one final place to tie up any loose 
 Use it how you please.
 
 
+## Special Behavior
+
+- Callbacks and route actions are only called once. If user taps the same route quickly, only the first tap will be counted.
+
+- If a new request comes in during an ongoing request, the new request will cancel the ongoing request. The ongoing request will complete the current middleware/callback, but will not move on to the next one.
+
+- If a new request comes in from pressing the browser's built-in back/next buttons, to main history synchronization, the initial request will complete while the subsequent requests are canceled. This is the opposite of above, and it's the correct heuristic since all the user is doing is *the same thing*, i.e. going back (or forward) even farther. Once the first tap of back/next completes, the impatient user can tap it again to go back even further.
+
+- Multiple redirects within the same request are followed, including pathless route callbacks and anonymous thunks.
+
+- `state.location.ready` is set to true when data-fetching callbacks are complete. You can use this to easily show a loading spinner anywhere in the component tree, without the need for *Suspense.*
+
+- Returning `false` from a callback cancels execution of the current pipeline.
+
+- Redirects cancel execution of the current pipeline and start another. The middleware pipeline is aware of when you dispatched (or returned) a redirect action within a callback.
+
 
 ## Summary
 

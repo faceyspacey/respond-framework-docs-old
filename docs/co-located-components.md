@@ -311,7 +311,7 @@ Internally Respond's middleware runner will branch off to run the child module's
 
 ## Conclusion
 
-Callbacks are guaranteed to run because they are merged at just the right time into a route that's already executing. In other words, **the plane is being built while it's flying.**
+Callbacks (and middleware) are guaranteed to run because they are merged at just the right time into a route that's already executing. In other words, **the plane is being built while it's flying!**
 
 Co-located components will only be ever be available along side its route dependencies. Even if you navigate to another route--and the component is still showing--it will still have access to all the state from when it first loaded. 
 
@@ -319,5 +319,5 @@ Co-located components will only be ever be available along side its route depend
 
 It's a co-location solution that makes perfect sense for Respond. Bet you didn't think co-location and a route centric framework were compatible!
 
-> In the future, as we invest more into GraphQL, we'll investigate the usage of fragments to reduce duplication between parent and child queries, as Relay does.
+> In the future, as we invest more into GraphQL, we'll investigate the usage of fragments to provide data masking and to reduce duplication between parent and child queries, as Relay does.
 

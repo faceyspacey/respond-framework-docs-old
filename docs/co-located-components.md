@@ -306,12 +306,12 @@ export default ({ deps }) => createModule({
 })
 ```
 
-Internally Respond's middleware runner will branch off to run the child module's middleware, and then complete the parent's pipeline subsequently.
+Internally Respond's middleware runner will branch off to run the child module's middleware, and then complete the parent's pipeline subsequently. `commit` middleware will all execute together in order to guarantee only a single action is dispatched. In order to do so, each middleware branch waits for others to catch up, and then after continues as parallel branches.
 
 
 ## Conclusion
 
-Callbacks (and middleware) are guaranteed to run because they are merged at just the right time into a route that's already executing. In other words, **the plane is being built while it's flying!**
+Callbacks (and middleware) are guaranteed to run because they are merged early in the route transition lifecycle into a route that's already executing. In other words, **the plane is being built while it's flying!**
 
 Co-located components will only be ever be available along side its route dependencies. Even if you navigate to another route--and the component is still showing--it will still have access to all the state from when it first loaded. 
 

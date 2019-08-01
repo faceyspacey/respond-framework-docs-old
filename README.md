@@ -3,10 +3,16 @@
 
 ![Respond Framework Homepage](./docs/images/respond-homepage.png)
 
-Respond Framework is what happens if you build Redux & first-class concerns for routing into React, plus take a page from the traditional server-side MVC playbook when it comes to side-effects. 
+Respond Framework is the next evolution of the Redux legacy built for a hooks + suspense era. It birthed out of one of the most important Redux libraries, [redux-first-router](https://github.com/faceyspacey/redux-first-router).
+
+Respond Framework is what happens if you make Redux modular and built it directly into React, while doing the same for routing, and making things as easy as they were in the server-side MVC days. 
+
+It's a re-think of how we build our apps that captures the best of the old days.
+
+With Respond you can use all your hooks and suspense tricks at the microscopic component level, but *also* take a step back and get the same modularity at higher macro levels that more naturally represent application boundaries.
 
 
-Here's a quick overview of the features and usage in Respond Framework.
+What follows is a quick overview of what you can do with Respond.
 
 
 
@@ -19,32 +25,34 @@ yarn add 'respond-framework'
 
 ## "Redux Components"
 
-For a taste of where we're going, behold:
+Components receive additional arguments for "global" `state` and `actions`:
 
 ```js
-function LoginComponent(props, state, actions) => {
+function LoginComponent(props, state, actions) {
   const onClick = state.session ?  actions.logout : actions.login
   const text = state.session ? 'LOGOUT' : 'LOGIN'
 
   return (
     <div>
-      <button onClick={actions.login}>{text}</button>
+      <button onClick={onClick}>{text}</button>
     </div>
   )
 }
 ```
 
-Gone are the days of `connect` + `mapState/DispatchToProps`. Had the additional args been left out, Babel would have compiled no alterations under the hood.
+But they aren't *global*. Rather, they are **collision-free** namespaced slices from the current module.
 
-More on this later...
+Gone are the days of `connect` + `mapState/DispatchToProps` and even hooks.
 
 
 
-## Modular (did I hear you say "Redux Modules"??)
+## Respond Modules
 
-Respond Framework is modular and encapsulated like React components, but at a higher level. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off and build with the confidence that what they bring back will plug in nicely.
+Components are in fact just one of the ingredients of "Respond Modules."
 
-Your app is composed of *Respond Modules*, which encapsulate **routes**, **components**, **reducers** and everything else you may need. `moduleProps` allow you to share `state`, `actions`, and `types` between parent modules and their children.
+Respond Framework is modular and encapsulated like React components, but at a much needed *higher level*. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off with confidence that what they build will plug in nicely.
+
+Your app is composed of Respond Modules, which encapsulate **routes**, **components**, **reducers**, **middelware** and everything else you may need. `moduleProps` allow you to share `state`, `actions`, and `types` between parent modules and their children.
 
 
 *src/modules/app/index.js*
@@ -96,7 +104,7 @@ const { firstRoute, store } = createApp({
 
 ```js
 import { createModule } from 'respond-framework'
-import { session } from './reducer'
+import { foo, bar } from './reducer'
 import { Dash, Metrics, Stats } from './components'
 
 export default createModule({
@@ -110,18 +118,84 @@ export default createModule({
 })
 ```
 
-> the configuration passed to `createApp` is also a module. *Respond* is "modules" all the way down.
+Significant-sized apps are made of many "modules" and therefore many calls to `createModule`. The configuration passed to `createApp` is also a module. The only difference between `createApp` and `createModule` is one is used to kick off your app. *Respond* is "modules" all the way down. Respond Modules are the *new component.* 
 
+The React team has done an astounding job pinpointing the least amount of API surface to comprise the component primitive. Respond follows the same rigorous path but on the other end of the spectrum: "mini apps." One is the perfect primitive for *micro* level components and the other for *macro* level mini apps. 
+
+And in their unity, GUI development is one step up the divine spiral of beauty.
+
+There's a lot more, let's continue.
+
+## No More JSX, no createElement
+
+JSX is in fact optional with Respond. Imagine if your components rendered by virtue of function calls:
+
+```js
+function Login({ color }, state, actions) {
+  const onClick = state.session ?  actions.logout : actions.login
+  const text = state.session ? 'LOGOUT' : 'LOGIN'
+
+  return div({
+    style: { color },
+    children: button({ onClick }, text)
+  })
+}
+
+const NavBar = props => div([Logo(), NavLinks(), Login({ color: 'pink' })])
+
+const App = props => [
+  NavBar(),
+  Content(),
+  Footer({ year: '3019', [
+    FirstColumn(),
+    SecondColumn(),
+    ThirdColumn()
+  ])
+]
+```
+
+The key element is that component boundaries still exist, allowing component to re-render independently if `setState` is called.
+
+Previous advocates of dropping JSX would have you write extra function calls throughout your codebase like so:
+
+```js
+const NavBar = props => (
+  React.createElement(div, {}, [
+    React.createElement(Logo),
+    React.createElement(NavLinks),
+    React.createElement(Login, { color: 'pink' })
+  ])
+)
+```
+
+Yuck! What we are doing is very different and far more natural. What you're building finally feels like one big pure function. 
+
+Behind the scenes Respond detects components created from regular functions and wraps them in `React.createElement` for you. That way you don't have to:
+
+```js
+const NavBarInner = props => div([Logo(), NavLinks(), Login({ color: 'pink' })])
+const NavBar = (props, children) => createElement(NavBarInner, props, children)
+```
+
+Now your code can just call `NavBar(props)`.
+
+This opens the doors for learners to learn just one language, not 3+ (HTML, CSS, and javascript). It's functions all the way down, which goes hand in hand with the React team's "hooks" initiative. That's far less friction and far more onboarded learners. 
+
+For advanced developers, it means one highly dynamic language to rule them all, less context switching. All you code is functions. Respond makes it so 99% of your app is pure functions. `App = f(state)` is finally a reality.
+
+With things like Web Assembly, we believe the overall vision for the web and GUI development is one without HTML and CSS, at least when it comes to the API we use. It can still exist under the hood (for as long as necessary), but it's not what we rely on for our work. 
+
+This is the future Respond is in the process of creating.
 
 ## Predictable Linear Effects
 
 No longer leave side-effects up to random discovery in your component tree!  
 
-> ["No surprises == better sleep"](https://twitter.com/faceyspacey/status/1107057805507227649) -Anton Korzunov (maintainer of React-Hot-Loader, react-imported-component)
+> ["No surprises == better sleep"](https://twitter.com/faceyspacey/status/1107057805507227649) -Anton Korzunov (maintainer of react-hot-loader, react-imported-component)
 
 Instead orchestrate them linearly once per route. 
 
-Trust us, React is great--**why do you think** ***Respond*** **is built on top of it**--but that doesn't mean every approach the React team promotes is spot on. Side-effects don't belong in your components, even with hooks :)
+Trust us, React is great--**why do you think** ***Respond*** **is built on top of it**--but that doesn't mean React has the final say on the best way to build your apps. Data-fetching side-effects don't belong in your components, even with hooks + suspense. And other fx now have other options.
 
 
 ### Here's how we roll:
@@ -161,10 +235,19 @@ export default createModule({
   }
 })
 ```
-> `types`, `actions`, `state`  supplied via dependency injection to avoid conflicts; which also means less importing
+
+In the first option the return, `api.get('items')`, is automatically dispatched with type `types.main.COMPLETE`. There's a lot less dispatching with Respond than with Redux classic.
+
+`types` here is supplied via dependency injection to avoid conflicts. That's also how components and reducers work. By leaving it to Respond, you're free to mix and match modules which may share similar names for reducers, types, etc. 
+
+> As seemingly small as that is, modular namespacing is the one thing that's been holding Redux back from allowing you to build large apps out of smaller mini apps, which is the cornerstone of first class software development process. It's also why the React team has invested so much in making components--which are already modular--do the things Redux exels at.
+
+Creators that have built significant apps know how monumental this is. As a bonus, it also means no more boilerplate importing this stuff everywhere.
+
 
 ### Add callbacks that fire for all routes:
 
+You can also add callbacks that fire for every route in the 2nd options argument:
 
 ```js
 import mixpanel from 'mixpanel'

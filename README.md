@@ -3,18 +3,28 @@
 
 ![Respond Framework Homepage](./docs/images/respond-homepage.png)
 
-Respond Framework is the next evolution of the Redux legacy built for a hooks + suspense era. It birthed out of one of the most important Redux libraries, [redux-first-router](https://github.com/faceyspacey/redux-first-router).
+Respond Framework is the next evolution of the Redux legacy built for a hooks + suspense era. If you have loved Redux, but have been unsure where it now stands, you've come to the right place. 
 
-Respond Framework is what happens if you make Redux modular and built it directly into React, while doing the same for routing, and making things as easy as they were in the server-side MVC days. 
+Respond birthed out of one of the most important Redux libraries, [redux-first-router](https://github.com/faceyspacey/redux-first-router). Respond solves longstanding issues with Redux that serious app developers have been waiting for. It competes head to head with hooks/suspense strategies, providing a superior solution for large apps. Fortunately you don't have to pick--you can mix Respond with your hooks. 
 
-It's a re-think of how we build our apps that captures the best of the old days.
-
-With Respond you can use all your hooks and suspense tricks at the microscopic component level, but *also* take a step back and get the same modularity at higher macro levels that more naturally represent application boundaries.
+The *Redux Revival* starts here.
 
 
-What follows is a quick overview of what you can do with Respond.
+## Overview
+
+Respond Framework is what happens if you make Redux modular and built it *directly* into React, while also doing the same for *routing*, and making things as easy as they were in the server-side MVC days. 
+
+It's a re-think of how we build our apps that captures the best of the old days. These are things that were unnecessarily thrown away that we want. Reincorporating them can be viewed as the pendulum swinging into balance. This is how software evolves--the pendulum swinging back and forth until reaching a new stable center. What are those *"things"?*
+
+The birds eye view is this: 
+
+- your apps can still be built from **request** and ***response*** building blocks like server-side MVC apps
+- action dispatches within "Respond modules" are namespaced and therefore isolated from the rest of your app, finally allowing you to think in terms of many mini Redux apps
+
+With Respond you can use all your hooks and suspense tricks at the microscopic component level, but *also* take a step back and get similar modularity at higher macro levels that more naturally represent application boundaries.
 
 
+Next Up: a quick overview of what you can do with Respond.
 
 ## Installation
 
@@ -238,9 +248,11 @@ export default createModule({
 
 In the first option the return, `api.get('items')`, is automatically dispatched with type `types.main.COMPLETE`. There's a lot less dispatching with Respond than with Redux classic.
 
-`types` here is supplied via dependency injection to avoid conflicts. That's also how components and reducers work. By leaving it to Respond, you're free to mix and match modules which may share similar names for reducers, types, etc. 
+`types` here is supplied via dependency injection to avoid conflicts. Under the hood the, insead of `'COMPLETE'`, the type might be `'dashboard/COMPLETE'`. 
 
-> As seemingly small as that is, modular namespacing is the one thing that's been holding Redux back from allowing you to build large apps out of smaller mini apps, which is the cornerstone of first class software development process. It's also why the React team has invested so much in making components--which are already modular--do the things Redux exels at.
+The arguments passed to components and reducers behave the same way. By leaving it to Respond, you're free to mix and match modules which may share similar names for reducers, types, etc. 
+
+> As seemingly small as this is, modular namespacing is the one thing that's been holding Redux back from allowing you to build large apps out of smaller mini apps, which is the cornerstone of first class software development process. It's also why the React team has invested so much in making components--which are already modular--do the things Redux exels at. They are both needed, one at the *micro* level and the other at the *macro* level.
 
 Creators that have built significant apps know how monumental this is. As a bonus, it also means no more boilerplate importing this stuff everywhere.
 
@@ -258,7 +270,7 @@ export default createModule({
   routes: {
     main: {
       path: '/',
-      thunk: thunk: ({ api }) => api.get('items')
+      thunk: ({ api }) => api.get('items')
     },
     metrics: '/metrics',
     stats: '/stats'
@@ -305,13 +317,13 @@ export default createModule({
 
 ```js
 export default createModule({
-+  reducers: { session, acceptedCookies },
++ reducers: { session, acceptedCookies },
   components,
   routes: {
     main: {
       path: '/',
       thunk: ({ api }) => api.get('items'),
-+      onLeave: ({ getState }) => !getState().acceptedCookies // return false to block route change
++     onLeave: ({ getState }) => !getState().acceptedCookies // return false to block route change
     },
     metrics: '/metrics',
     stats: '/stats'
@@ -370,12 +382,10 @@ const routes = {
   CHECKOUT_STEP_2: '/checkout/step-2',
   DASHBOARD: {
     path: '/dashboard',
-    load: () => ({ // typically code-split
-      routes: {
-        METRICS: '/metrics',
-        STATS: '/stats'
-      }
-    })
+    routes: {
+      METRICS: '/metrics',
+      STATS: '/stats'
+    }
   }
 }
 ```
@@ -412,7 +422,7 @@ For each route you also get several additional action creators. Let's take `HOME
 
 Because *Respond Modules* are guaranteed to be unaware of the outside world **(even though they're conveniently using the same store)**, `actions`, `types` and `state` must be injected by the framework. 
 
-This allows Respond to transparently normalize namespace access under the hood via proxies, so you only have to use namespaces where you absolutely must. Let's take a look at where `actions` appear:
+This allows Respond to transparently normalize namespace access under the hood, so you only have to use namespaces where you absolutely must. Let's take a look at where `actions` appear:
 
 
 ***callbacks:***
@@ -435,11 +445,45 @@ reducers: {
 
 ```js
 const MyComponent = (props, state, actions) =>
-  <Button onClick={actions.home()} />
+  <Button onClick={actions.metrics()} />
 ```
 
+Children won't be able to access any actions, state, or types of the parent (or siblings) though. They are a fully isolated world all their own.
 
-> NOTE: **Actions, state and types from child modules are available in parent components by their namespace.** Whereas child modules must use `moduleProps` to access the same from the parent. In other words, parents get to know whats up with their children, but not the other way around *(kind of like in real life :)*
+Parents however can access aspects of children. They must do so via the fully qualified namespace:
+
+```js
+const ComponentInParentModule = (props, state, actions) =>
+  <Button onClick={actions.dashboard.metrics()} />
+```
+
+In other words, parents get to know whats up with their children, but not the other way around *(like in real life).*
+
+You however can explicitly work around this arrangement. For example, child modules can know about sibling modules if explicitly given access through the shared parent via `moduleProps`:
+
+```js
+routes: {
+  home: '/',
+  login: '/login',
+  dashboard: {
+    path: '/dashboard',
+    load: () => import('../modules/dashboard'),
+    moduleProps: {
+      state: {
+        foo: state => state.sibling.foo
+      }
+    }
+  },
+  sibling: {
+    path: '/sibling',
+    load: () => import('../modules/sibling')
+  }
+}
+
+const DashboardComponent = (props, state) => <div>{state.foo}</div>
+```
+
+This is the same pattern as *"lifting state"* in traditional React. We have to admit: putting existing React skills to use with this pattern is quite refreshing. Being able to do the same on both *micro* and *macro* levels feels correct.
 
 
 
@@ -509,9 +553,9 @@ Now say you had an error:
 MY_ENTITY: {
   path: '/entity/:slug',
   thunk: async ({ api }, { params }) => {
-    const { items, error } = await api.get(`entity/${slug}`)
+    const items = await api.get(`entity/${slug}`)
     
-    if (error) {
+    if (!items) {
       actions.myEntity.error(new Error('explosion'))
     }
 
@@ -562,7 +606,7 @@ const MyComponent = ({ arg }, state, actions) =>
   <Button onClick={actions.myEntity({ slug: arg })} />
 ```
 
-That's because, `home()` returns a memoized function reference that only changes if the arguments change. It's a minor automation over doing the following in *Modern React*:
+That's because, `home()` and `myEntity()` return a memoized function reference that only changes if the arguments change. It's a minor automation over doing the following in *Modern React*:
 
 ```js
 import { useCallback } from 'react'
@@ -629,7 +673,7 @@ Here's what usage of Respond's `snapActions` test runner looks like:
 
 ```js
 import { snapActions } from 'respond-framework/test'
-import actions from './action-sequences'
+import actions from './actions/sequence-1'
 import { App, config, options } from '../src'
 
 test('my whole app', async () => {
@@ -720,15 +764,35 @@ If you choose to dispatch `NOT_FOUND` when something goes wrong (which is a fine
 However, if the URL in the route transition was pre-determined (such as from a direct visitor), but no matching route found, the URL will stay the same in the address bar, *while dispatching the `NOT_FOUND` type.* This is preferable in this case.
 
 
-Lastly, `actions.notFound.complete` and other additional generated action creators also exist. There's very little different between `NOT_FOUND` and other routes, except Respond directs your users here as a fallback when things go wrong (and insures you have at least one of these routes).
+Lastly, `actions.notFound.complete` and other additional generated action creators also exist. There's very little different between `NOT_FOUND` and other routes, except Respond directs your users here as a fallback when things go wrong.
 
 
 
 ## Automatic Code Splitting
 
-Respond automatically code splits your app. There's nothing you have to do about it, it just happens through normal use of modules. 
+Respond automatically code splits your app. There's nothing you have to do about it, it just happens through normal use of modules using the `load` route option and a dynamic import:
 
-It's provided through one of our middleware. If you don't provide a `middleware` array, here's the default one:
+```js
+dashboad: {
+  path: '/dashboard',
+  load: () => import('../modules/dashboard')
+}
+```
+
+which is equivalent to statically nested routes:
+
+```js
+dashboad: {
+  path: '/dashboard',
+  routes: {
+    main: '/',
+    metrics: '/metrics',
+    stats: '/stats'
+  }
+}
+```
+
+`load` is resolved through a middleware. If you don't provide a `middleware` array, here's the default one:
 
 ```js
 export default createModule(config, options, [
@@ -783,9 +847,7 @@ If you, supply just a string as in `types.login`, only the chunk for the matchin
 
 ## Serve Chunks w/ SSR
 
-SSR is challenging. Code Splitting is challenging.
-
-SSR + Splitting unfortunately is greater than the sum of its parts, which is to say ***combination SSR + Splitting*** **is many times more challenging.** 
+SSR is challenging. Code Splitting is challenging. But doing both together is many times harder.
 
 With Respond it's *just* a matter of passing the `request` `url` and *awaiting* your `firstRoute()`. 
 
@@ -807,7 +869,7 @@ export default async function configureStore(request) {
 }
 ```
 
-And then extracting used chunks from state:
+And then extracting used chunks from state (yes, Respond is aware of your Webpack chunks):
 
 *server/serverRender.js:*
 ```javascript
@@ -863,7 +925,7 @@ app.get('*', serverRender)
 http.createServer(app).listen(3000)
 ```
 
-SSR with *Respond* doesn't lock you into a *"walled garden"* (like other solutions) for how to manage your application's server. You can use Express, Koa, Node, Babel and Webpack as you normally would.
+SSR with *Respond* doesn't lock you into a *"walled garden"* (like other solutions). You can use Express, Koa, Node, Babel and Webpack as you normally would.
 
 
 Yes, we wrote the book when it comes to routing, splitting and SSR, especially in a Redux world. ***Respond Framework*** **is the direct heir to:**
@@ -968,7 +1030,7 @@ dashboad: {
 
 Modules can receive `props` just like components can. The purpose is different though: 
 
-- **`moduleProps` serve the purpose of aliasing existing state coming from parent modules**
+- **`moduleProps` serve the purpose of aliasing existing `state`, `actions` & `types` coming from parent modules**
 - **and therefore keep all state in a** ***single easily time-travellable + testable store*** 
 
 Here's how you tell the `dashboard` module about pre-existing state and actions in the parent:
@@ -991,8 +1053,19 @@ dashboad: {
 }
 ```
 
-> So `getState().user` will be made available through the `state` proxy at `state.session` and the equivalent for `actions.login` in the `actions` proxy. It's just coincidence that the child module documents an expected action by the same name of `login`.
+`getState().user` will be made available through the `state` proxy at `state.session` and the equivalent for `actions.login` in the `actions` proxy. It's just coincidence that the child module documents an expected action by the same name of `login`.
 
+You can also use functions instead of strings:
+
+```js
+moduleProps: {
+  state: {
+    user: state => state.session
+  }
+}
+```
+
+Within the child module, access will still be `state.user`, rather than `state.user()`.
 
 ## Module Parameterization 
 
@@ -1028,7 +1101,6 @@ CHECKOUT: {
 }
 ```
 
-*Batteries not included*
 
 
 ## Modules, Nesting, Splitting, Oh My!

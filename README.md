@@ -5,23 +5,23 @@
 
 Respond Framework is the next evolution of the Redux legacy built for a hooks + suspense era. If you have loved Redux, but have been unsure where it now stands, you've come to the right place. 
 
-Respond birthed out of one of the most important Redux libraries, [redux-first-router](https://github.com/faceyspacey/redux-first-router). Respond solves longstanding issues with Redux that serious app developers have been waiting for. It competes head to head with hooks/suspense strategies, providing a superior solution for large apps. Fortunately you don't have to pick--you can mix Respond with your hooks. 
+Respond birthed out of one of the most important Redux libraries, [redux-first-router](https://github.com/faceyspacey/redux-first-router). Respond solves longstanding issues with Redux that serious app developers have been waiting for. It tackles crucial areas hooks/suspense are not focused on, providing a superior overall solution for large apps. Fortunately you don't have to pick--you can mix Respond with hooks. 
 
 The *Redux Revival* starts here.
 
 
 ## Overview
 
-Respond Framework is what happens if you make Redux modular and built it *directly* into React, while also doing the same for *routing*, and making things as easy as they were in the server-side MVC days. 
+Respond Framework is what happens if you make Redux **modular** and built it *directly* into React, while also building **routing** directly into the framework. The result being things made as easy as they were in the server-side MVC days, while gaining all the benefits modern javascript has brought in terms of modularly building large apps out of many small apps. 
 
-It's a re-think of how we build our apps that captures the best of the old days. These are things that were unnecessarily thrown away that we want. Reincorporating them can be viewed as the pendulum swinging into balance. This is how software evolves--the pendulum swinging back and forth until reaching a new stable center. What are those *"things"?*
+It's a re-think of how we build our apps that captures the best of the old ways and new ways.
 
 The birds eye view is this: 
 
-- your apps can still be built from **request** and ***response*** building blocks like server-side MVC apps
-- action dispatches within "Respond modules" are namespaced and therefore isolated from the rest of your app, finally allowing you to think in terms of many mini Redux apps
+- your apps can still be built from **request** and ***response*** building blocks like server-side MVC apps in olden times
+- action dispatches within **"Respond modules"** are namespaced and therefore isolated from the rest of your app, finally allowing you to think in terms of *many mini Redux apps*
 
-With Respond you can use all your hooks and suspense tricks at the microscopic component level, but *also* take a step back and get similar modularity at higher macro levels that more naturally represent application boundaries.
+With Respond you can use all your hooks and suspense tricks at the microscopic component level, but *also* take a step back and get similar **modularity** at higher macro levels that more naturally represent application boundaries. The latter is a world first we have eagerly been awaiting.
 
 
 Next Up: a quick overview of what you can do with Respond.
@@ -52,7 +52,7 @@ function LoginComponent(props, state, actions) {
 
 But they aren't *global*. Rather, they are **collision-free** namespaced slices from the current module.
 
-Gone are the days of `connect` + `mapState/DispatchToProps` and even hooks.
+You will **NOT** have to `connect`, `mapState`, `useSelector`, or `useDispatch` anywhere in your Respond app. This is what we mean by "the store is built **directly** into React."
 
 
 
@@ -60,25 +60,64 @@ Gone are the days of `connect` + `mapState/DispatchToProps` and even hooks.
 
 Components are in fact just one of the ingredients of "Respond Modules."
 
-Respond Framework is modular and encapsulated like React components, but at a much needed *higher level*. It gives you a birds-eye perspective of important portions of your app & enables separate developer teams to go off with confidence that what they build will plug in nicely.
+A Respond module contains  **routes**, **components**, **reducers**, **middelware** and various configuration **options**. 
 
-Your app is composed of Respond Modules, which encapsulate **routes**, **components**, **reducers**, **middelware** and everything else you may need. `moduleProps` allow you to share `state`, `actions`, and `types` between parent modules and their children.
+Respond modules are encapsulated like React components, but at a *higher level*. They give you a birds-eye perspective of important portions of your app. They let you define application boundaries more broadly and flexibly than components. 
 
+Because Respond modules are both modular and can encompass *all* aspects of an app, they enable separate developer teams to go off with confidence that they can build large feature sets which will plug in nicely.
+
+A minimal module might contain just routes, components and reducers:
+
+```js
+import { createModule } from 'respond-framework'
+import Link from 'respond-framework/link'
+
+export default createModule({
+  routes: {
+    home: '/',
+    login: '/login'
+  },
+  components: {
+    App: (props, state, actions) => (
+      <div>
+        <h1>My App</h1>
+        <h2>page: {state.page}</h2>
+        <Link to={actions.login}>Login</Link>
+      </div>
+    )
+  },
+  reducers: {
+    page: (state = 'Home', action, types) => {
+      switch(action.type) {
+        case types.LOGIN:
+          return 'Login'
+        case types.HOME:
+          return 'Home'
+        default:
+          return state
+      }
+    }
+  }
+})
+```
+
+
+However, to get the full benefit of a module system, you must have at least 2, which are able to be used together without naming conflicts:
 
 *src/modules/app/index.js*
 
 ```js
-import { createApp } from 'respond-framework'
+import { createModule } from 'respond-framework'
 import ReactDOM from 'react-dom'
-import enhancer from './enhancer'
-import reducer from './reducer'
+import middlewares from './middlewares'
+import reducers from './reducers'
 import components from './components'
 
-const { firstRoute, store } = createApp({
-  enhancer,
-  reducer,
-  initialState: window.RESPOND_STATE,
+const { firstRoute, store } = createModule({
+  middlewares,
+  reducers,
   components,
+  initialState: window.RESPOND_STATE,
   routes: {
     home: '/',
     login: '/login',
@@ -87,10 +126,10 @@ const { firstRoute, store } = createApp({
       load: () => import('../modules/dashboard'),
       moduleProps: {
         state: {
-          user: 'session'
+          user: state => state.session
         },
         actions: {
-          login: 'login'
+          logout: actions => actions.logUserOut
         }
       }
     }
@@ -114,12 +153,20 @@ const { firstRoute, store } = createApp({
 
 ```js
 import { createModule } from 'respond-framework'
-import { foo, bar } from './reducer'
-import { Dash, Metrics, Stats } from './components'
+import reducers from './reducers'
+import Content from './components/Content'
 
 export default createModule({
-  reducers: { foo, bar },
-  components: { Dash, Metrics, Stats },
+  reducers,
+  components: {
+    Dashboard: (props, state, actions) => (
+      <div>
+        <h1>Welcome, {state.user.firstName}</h1>
+        <Content />
+        <span onClick={actions.logout}>Logout</span>
+      </div>
+    )
+  },
   routes: {
     main: '/',
     metrics: '/metrics',
@@ -128,13 +175,14 @@ export default createModule({
 })
 ```
 
-Significant-sized apps are made of many "modules" and therefore many calls to `createModule`. The configuration passed to `createApp` is also a module. The only difference between `createApp` and `createModule` is one is used to kick off your app. *Respond* is "modules" all the way down. Respond Modules are the *new component.* 
+Here for the first time we see the top level module kickstarting an app using `ReactDOM.hydrate` and the dispatching of `firstRoute()` on the store. This is very similar to the pattern established by [faceyspacey/redux-first-router](https://github.com/faceyspacey/redux-first-router).
 
-The React team has done an astounding job pinpointing the least amount of API surface to comprise the component primitive. Respond follows the same rigorous path but on the other end of the spectrum: "mini apps." One is the perfect primitive for *micro* level components and the other for *macro* level mini apps. 
+`moduleProps` however is the star. They are the glue that binds multiple modules together. They allow you to share `state`, `actions`, and `types` between parent modules and their children, while using a single time-travellable store. The Redux devtools still work with Respond!
 
-And in their unity, GUI development is one step up the divine spiral of beauty.
+To use them, assign a retrieval function to keys the child accepts. On the child, they are conveniently available via property access, rather than a function.
 
-There's a lot more, let's continue.
+> The React team has done an astounding job pinpointing the least amount of API surface to comprise the component primitive. Respond follows the same rigorous path but on the other end of the spectrum: "mini apps." One is the perfect primitive for *micro* level components and the other for *macro* level mini apps. 
+
 
 ## No More JSX, no createElement
 

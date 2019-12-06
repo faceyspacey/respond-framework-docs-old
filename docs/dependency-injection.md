@@ -1,6 +1,5 @@
 # Dependency Injection
 
-
 Standard procedure for injecting an `api` instance (or any other such utility) into callbacks goes something like this:
 
 ```js

@@ -1614,10 +1614,10 @@ The token should also be persisted in `localStorage` (or cookies if you're doing
 so you can pass it to your `api` instance during store creation:
 
 ```js
-createModule(routes, { extra: { api: new Api } })
+createModule(routes, { inject: { api: new Api } })
 ```
 
-> the `extra` object will be merged into callback `request` instances. Providing token-storing `Api` instances like this--rather than simply importing it and using it directly in callbacks--allows for the necessary server-side request isolation that SSR requires.
+> the `inject` object will be merged into callback `request` instances. Providing token-storing `Api` instances like this--rather than simply importing it and using it directly in callbacks--allows for the necessary server-side request isolation that SSR requires.
 
 If you're app doesnt have SSR, you can use [redux-persist](https://github.com/rt2zz/redux-persist), and get it from there on store creation.
 

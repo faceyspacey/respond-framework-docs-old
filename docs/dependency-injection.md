@@ -1,11 +1,43 @@
 # Dependency Injection
 
-Standard procedure for injecting an `api` instance (or any other such utility) into callbacks goes something like this:
+It's common to want to make available additional tools and data in middleware and callbacks. This is called "dependency injection." The `inject` option serves this purpose:
+
+```js
+import { isMobile } from './helpers'
+
+createModule({
+  options: {
+    inject: {
+      context: { isMobile: isMobile() },
+    }
+  }
+})
+```
+
+Events that makes use of this `context` object might look like this:
+
+```js
+events: {
+  home: {
+    path: '/',
+    beforeEnter: ({ context: { isMobile }, types }) => {
+      if (isMobile()) return { type: types.mobile } // redirect
+    }
+  },
+  mobile: '/mobile',
+},
+```
+
+## Api Example
+
+The most common use case is an `api` instance, which stores user tokens for use across multiple route transtions. On the server, this design is required because multiple tokens would end be up shared between requests:
+
+*src/app.js*
 
 ```js
 import Api from './Api'
 
-export default (request, response) => createApp({
+export default (request, response) => createModule({
   routes,
   components,
   reducers,
@@ -13,16 +45,65 @@ export default (request, response) => createApp({
   options: {
     inject: {
       api: new Api(request, response),
-      miscContext: { foo: 'bar' },
-      etc
     }
   }
 })
 ```
 
-> you will want to make `request` and `response` available on server; they are needed to access to the Express APIs for cookie handling. `request` in this case is obviously an Express `request`, not a Respond one.
+*server/render.js*
 
-Now, in your route callbacks, the key/vals of `inject` will be merged into the **Respond `request`** passed to callbacks and available like so:
+```js
+import ReactDOM from 'react-dom'
+import { Provider } from 'respond-framework'
+import createApp from '../src/app'
+import App from '../src/components/App'
+
+export default ({ clientStats }) => async (req, res) => {
+  const { app } = createApp(req, res)
+  
+  const { state } = await app.start()
+  const { redirect, status, url } = state.location
+
+  if (redirect) return res.redirect(status, url)
+
+  return res.send(
+    `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${state.title}</title>
+        </head>
+        <body>
+          <script>window.RESPOND_STATE = ${JSON.stringify(state)}</script>
+          <div id="root">
+            ${ReactDOM.renderToString(<Provider app={app}><App /></Provider>)}
+          </div>
+          <script type='text/javascript' src='/static/vendor.js'></script>
+          ${app.flushChunks(clientStats)}
+        </body>
+      </html>`
+  )
+}
+
+```
+
+> in *render.js*, `req` and `res` are Express instances. They are needed to access to the Express APIs for cookie handling.
+
+Now, in your route callbacks, the `api` instance made available by inject will already have a token from cookies associated with it:
+
+```js
+MY_POSTS: {
+  path: '/my-posts',
+  thunk: async (request, action) => {
+    const { api, actions } = request
+    const { posts } = await api.get('post/list') // token
+
+    return posts
+  }
+}
+```
+
+On login client side an `api.login` method would initially generate a token and store it within your `api` instance:
 
 ```js
 SUBMIT_LOGIN: {
@@ -36,11 +117,10 @@ SUBMIT_LOGIN: {
 }
 ```
 
-
 ## Api Class
 
-This is how you might implement the `Api` class. The important part is how your access token is made transparently/automatically available to all requests once the user logs in:
 
+An `Api` class to universally handle token acceptance and application to requests might look like this:
 
 ```js
 import axios from 'axios' // popular data fetching library
@@ -124,7 +204,7 @@ export default class Api {
       return { success: true }
     }
 
-    return { message }
+    return { error: true, message }
   }
 }
 ```
@@ -161,6 +241,6 @@ export default class Cookie extends UniversalCookie {
 }
 ```
 
-The reason you use cookies is because `localStorage` isn't available server-side. Therefore, cookies are the only *universal* solution, as they're available on both the client and the server. 
+The reason you use cookies is because `localStorage` isn't available server-side. Therefore, cookies are the ***only universal solution*** available on both the client *and* the server. 
 
-Client-only single page apps could just as well use `localStorage`, of which there are many similar examples on the web you can learn from.
+Client-only single page apps could just as well use `localStorage`, of which there are many similar examples on the web you can learn from. If you'd like to supply a client-only example, a PR to this page would likely be accepted.
